@@ -10,8 +10,13 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
-    // Financial invariants must be deterministic; no retries masking flakiness.
+    globalSetup: ['./tests/setup-db.ts'],
+    // Integration tests share one database, so they run in a single process.
+    // Financial invariants must be deterministic: no retries masking flakiness.
+    fileParallelism: false,
     retry: 0,
     sequence: { shuffle: false },
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 });

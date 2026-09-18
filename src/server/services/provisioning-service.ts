@@ -77,7 +77,11 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
   let account = await prisma.tradingAccount.findUnique({ where: { orderId } });
 
   if (!account) {
-    if (job.state === 'paid') {
+    // Move into `provisioning` from whichever waiting state we are in. A retry
+    // arrives here in `provisioning_failed_retryable` (or `manual_review` after
+    // an operator re-queues it), and without this step the success and failure
+    // transitions below would both be illegal from that state.
+    if (job.state === 'paid' || job.state === 'provisioning_failed_retryable' || job.state === 'manual_review') {
       await transition(job.id, 'provisioning', { attempts: { increment: 1 } });
     }
 
@@ -137,7 +141,7 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
     } catch (error) {
       const retryable = (error as Error & { retryable?: boolean }).retryable !== false;
       const nextState = nextStateAfterFailure(job.attempts + 1, retryable);
-      await transition(job.id, nextState === 'manual_review' ? 'manual_review' : 'provisioning_failed_retryable', {
+      await transition(job.id, nextState, {
         lastError: error instanceof Error ? error.message : String(error),
         retryable,
         nextAttemptAt: new Date(Date.now() + 30_000),
