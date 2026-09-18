@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getPlanViews } from '@/server/views/catalog-view';
 import { Badge, Card } from '@/components/ui';
 import { PlanComparisonTable } from '@/components/PlanComparisonTable';
+import { HomeHero } from '@/components/HomeHero';
 
 /**
  * Home.
@@ -16,41 +17,9 @@ export default function HomePage() {
   const fiftyK = plans.find((p) => p.key === 'SIM_50K')!;
 
   return (
-    <div className="mx-auto max-w-7xl px-4">
-      <section className="py-16 sm:py-24 max-w-3xl">
-        <p className="text-accent font-medium text-sm uppercase tracking-wider">
-          Simulated futures accounts
-        </p>
-        <h1 className="mt-3 text-4xl sm:text-5xl font-bold tracking-tight leading-tight">
-          Buy an account. Trade it the same day. No evaluation.
-        </h1>
-        <p className="mt-5 text-lg text-fg-muted leading-relaxed">
-          Purchase access to a simulated futures account and start trading it under published
-          rules. There is no evaluation phase, no profit target to pass first, no consistency
-          rule and no minimum number of trading days.
-        </p>
-        <p className="mt-4 text-fg-subtle leading-relaxed">
-          Trading is simulated. The account size is a nominal figure, not cash held for you. What
-          you can earn is a real cash reward calculated against simulated profits, split 50/50: a{' '}
-          <span className="text-fg-muted tnum">$500</span> gross withdrawal reduces the simulated
-          account by <span className="text-fg-muted tnum">$500</span> and pays you{' '}
-          <span className="text-fg-muted tnum">$250</span> in cash.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/accounts"
-            className="rounded-lg bg-accent px-6 py-3 font-semibold text-bg hover:bg-accent-strong transition-colors"
-          >
-            Compare accounts
-          </Link>
-          <Link
-            href="/rules"
-            className="rounded-lg border border-border-strong px-6 py-3 font-medium hover:border-accent hover:text-accent transition-colors"
-          >
-            Read the rules first
-          </Link>
-        </div>
-      </section>
+    <>
+      <HomeHero />
+      <div className="mx-auto max-w-7xl px-4">
 
       <section aria-labelledby="plans" className="pb-16">
         <div className="flex flex-wrap items-baseline justify-between gap-3 mb-6">
@@ -208,5 +177,7 @@ export default function HomePage() {
         </ul>
       </section>
     </div>
+    </>
+
   );
 }

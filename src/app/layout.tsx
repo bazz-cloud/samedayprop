@@ -3,11 +3,15 @@ import './globals.css';
 import { getConfig } from '@/server/config';
 import { DemoBanner } from '@/components/DemoBanner';
 import { SiteHeader } from '@/components/SiteHeader';
+import { ValueBar } from '@/components/ValueBar';
 import { SiteFooter } from '@/components/SiteFooter';
 import { getCurrentUser } from '@/server/auth/session';
 
 export const metadata: Metadata = {
-  title: 'Simulated Futures Accounts',
+  title: {
+    default: 'Bull Rush Futures',
+    template: '%s | Bull Rush Futures',
+  },
   description:
     'Purchase access to a simulated futures account with no evaluation phase, ' +
     'no consistency rule and same-day payout eligibility.',
@@ -28,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         {config.isDemo && <DemoBanner />}
         <SiteHeader user={user} />
+        <ValueBar />
         <main id="main" className="flex-1">
           {children}
         </main>

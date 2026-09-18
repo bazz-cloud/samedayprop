@@ -61,15 +61,17 @@ function env(key: string): string | undefined {
 const PLACEHOLDER_PREFIX = 'PLACEHOLDER';
 
 function readCompany(): CompanyPlaceholders {
-  const name = env('COMPANY_NAME') ?? `${PLACEHOLDER_PREFIX} Trading Co.`;
+  const name = env('COMPANY_NAME') ?? 'Bull Rush Futures';
   const legalEntity = env('COMPANY_LEGAL_ENTITY') ?? `${PLACEHOLDER_PREFIX} legal entity name`;
   const jurisdiction = env('COMPANY_JURISDICTION') ?? `${PLACEHOLDER_PREFIX} jurisdiction`;
   const supportEmail = env('COMPANY_SUPPORT_EMAIL') ?? 'support@example.invalid';
   const postalAddress = env('COMPANY_POSTAL_ADDRESS') ?? `${PLACEHOLDER_PREFIX} postal address`;
 
-  const incomplete = [name, legalEntity, jurisdiction, postalAddress].some((v) =>
-    v.includes(PLACEHOLDER_PREFIX),
-  ) || supportEmail.endsWith('.invalid');
+  // The trading name is supplied; the registrable details are not, and those
+  // are what legal documents and the launch gate actually depend on.
+  const incomplete =
+    [legalEntity, jurisdiction, postalAddress].some((v) => v.includes(PLACEHOLDER_PREFIX)) ||
+    supportEmail.endsWith('.invalid');
 
   return { name, legalEntity, jurisdiction, supportEmail, postalAddress, incomplete };
 }
