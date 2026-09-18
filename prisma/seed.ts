@@ -19,7 +19,7 @@ import { hashPassword } from '../src/server/auth/passwords';
 import { LEGAL_DOCUMENT_DRAFTS, hashDocumentBody } from '../src/server/legal/documents';
 import { PLANS, TRAILING_STOP_OFFSET } from '../src/domain/catalog/plans';
 import { computeThreshold } from '../src/domain/risk/trailing';
-import { DEFAULT_SESSION_CONFIG, sessionDateFor } from '../src/domain/risk/session';
+import { DEFAULT_SESSION_CONFIG, nextMarketOpen, sessionDateFor } from '../src/domain/risk/session';
 import { Money, usd } from '../src/domain/money/money';
 import { DEFAULT_COUPON } from '../src/domain/pricing/coupon';
 
@@ -252,12 +252,14 @@ const SCENARIOS: ScenarioSpec[] = [
     email: 'trader.dailypaused@example.invalid',
     name: 'Dana Daily',
     planKey: 'SIM_50K',
-    description: 'Hit the $700 daily loss limit. Flattened and paused until the next session.',
-    equity: '49300.00',
+    description: 'Hit the daily loss limit. Flattened and locked out until the Globex reopen.',
+    equity: '49405.00',
     highWater: '50200.00',
     tradingStatus: 'DAILY_PAUSED',
     provisioningState: 'active',
-    statusReason: 'Session trading loss reached the daily limit of $700.00.',
+    statusReason:
+      'Session trading loss reached the daily limit of $595.00. Trading is locked until the ' +
+      'market reopens at 18:00 ET.',
     sessionStartEquity: '50000.00',
   },
   {
@@ -266,11 +268,13 @@ const SCENARIOS: ScenarioSpec[] = [
     name: 'Bran Breached',
     planKey: 'SIM_50K',
     description: 'Equity fell to the trailing threshold. Trading access terminated.',
-    equity: '49500.00',
+    equity: '49700.00',
     highWater: '51500.00',
     tradingStatus: 'BREACHED',
     provisioningState: 'active',
-    statusReason: 'Account equity reached the trailing threshold of $49,500.00.',
+    statusReason:
+      'Account equity reached the maximum drawdown threshold of $49,700.00. Trading access is ' +
+      'terminated. A reset is available.',
     sessionStartEquity: '51000.00',
   },
   {
@@ -518,10 +522,21 @@ async function seedScenario(spec: ScenarioSpec, password: Awaited<ReturnType<typ
         : null,
       dataStale: spec.dataStale ?? false,
       lastSequence: 10n,
+      lockedOutUntil:
+        spec.tradingStatus === 'DAILY_PAUSED'
+          ? nextMarketOpen(new Date(), DEFAULT_SESSION_CONFIG.value)
+          : null,
       breachedAt: spec.tradingStatus === 'BREACHED' ? new Date() : null,
       breachReason: spec.tradingStatus === 'BREACHED' ? spec.statusReason ?? null : null,
     },
   });
+
+  // Seeded accounts skip runProvisioning, so credentials are issued here —
+  // otherwise the demo has active accounts with no platform sign-in.
+  if (hasExternalAccount) {
+    const { issueCredential } = await import('../src/server/services/credential-service');
+    await issueCredential(accountId);
+  }
 
   if (hasExternalAccount) {
     await prisma.positionSnapshot.create({

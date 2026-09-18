@@ -9,6 +9,8 @@ import {
   sessionStartInstant,
   zonedParts,
   zoneOffsetMs,
+  nextMarketOpen,
+  lockoutHasLifted,
 } from '@/domain/risk/session';
 
 const config = DEFAULT_SESSION_CONFIG.value;
@@ -113,5 +115,43 @@ describe('session attribution', () => {
 
   it('is marked PROPOSED until the exchange calendar is approved', () => {
     expect(DEFAULT_SESSION_CONFIG.status).toBe('PROPOSED');
+  });
+});
+
+describe('daily-loss lockout lifts at the Globex reopen', () => {
+  it('locks until 18:00 ET the same evening when breached during the day', () => {
+    // 11:00 ET on a Tuesday.
+    const breach = new Date('2026-01-20T16:00:00Z');
+    expect(nextMarketOpen(breach, config).toISOString()).toBe('2026-01-20T23:00:00.000Z');
+  });
+
+  it('rolls to the next day when breached after the reopen', () => {
+    // 20:00 ET, already past the 18:00 reopen.
+    const breach = new Date('2026-01-21T01:00:00Z');
+    expect(nextMarketOpen(breach, config).toISOString()).toBe('2026-01-21T23:00:00.000Z');
+  });
+
+  it('lifts AFTER the session roll, not at it', () => {
+    // The session refreshes the daily allowance at 17:00, but the market does
+    // not reopen until 18:00, so the lockout outlasts the roll by an hour.
+    const breach = new Date('2026-01-20T16:00:00Z');
+    const lift = nextMarketOpen(breach, config);
+    const roll = sessionEndInstant(sessionDateFor(breach, config), config);
+    expect(lift.getTime()).toBeGreaterThan(roll.getTime());
+    expect(lift.getTime() - roll.getTime()).toBe(HOUR);
+  });
+
+  it('tracks the timezone across the DST change rather than a fixed offset', () => {
+    // Winter: 18:00 EST is 23:00Z. Summer: 18:00 EDT is 22:00Z.
+    expect(nextMarketOpen(new Date('2026-01-20T16:00:00Z'), config).toISOString())
+      .toBe('2026-01-20T23:00:00.000Z');
+    expect(nextMarketOpen(new Date('2026-07-20T15:00:00Z'), config).toISOString())
+      .toBe('2026-07-20T22:00:00.000Z');
+  });
+
+  it('treats a null lockout as already lifted', () => {
+    expect(lockoutHasLifted(null)).toBe(true);
+    expect(lockoutHasLifted(new Date('2020-01-01T00:00:00Z'))).toBe(true);
+    expect(lockoutHasLifted(new Date('2099-01-01T00:00:00Z'))).toBe(false);
   });
 });

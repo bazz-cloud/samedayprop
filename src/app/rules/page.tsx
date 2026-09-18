@@ -80,7 +80,7 @@ export default function RulesPage() {
             profitable account keeps a small floor.
           </li>
           <li>
-            &bull; Equity <strong className="text-fg">touching</strong> the threshold is a breach,
+            &bull; Equity <strong className="text-fg">touching</strong> the threshold is a maximum drawdown breach,
             not only falling below it. A breach ends trading access on that account.
           </li>
         </ul>
@@ -105,8 +105,8 @@ export default function RulesPage() {
           They do still reduce your equity, so they reduce your remaining trailing room.
         </Callout>
         <p className="text-fg-muted leading-relaxed">
-          Reaching the daily loss limit flattens your positions and pauses trading until the next
-          session. Sessions roll at 17:00 America/New_York, handled correctly across daylight-saving
+          Reaching the daily loss limit flattens your positions and locks trading until the Globex
+          reopen at 18:00 ET — an hour after the session roll that refreshes your allowance. Sessions roll at 17:00 America/New_York, handled correctly across daylight-saving
           changes, so you always get exactly one daily allowance per session.
         </p>
       </section>

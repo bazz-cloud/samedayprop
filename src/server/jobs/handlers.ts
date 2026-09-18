@@ -115,16 +115,25 @@ export const HANDLERS: Record<JobKind, JobHandler> = {
   },
 
   ROLL_TRADING_SESSION: async () => {
-    const accounts = await prisma.tradingAccount.findMany({
-      where: { tradingStatus: 'DAILY_PAUSED' },
+    // A daily lockout lifts at the Globex reopen, which is an hour after the
+    // session roll — so this resumes only the accounts whose lockout has
+    // actually expired, not every paused account. A max drawdown breach never
+    // lifts here; that account is terminated and needs a paid reset.
+    const now = new Date();
+    const due = await prisma.tradingAccount.findMany({
+      where: { tradingStatus: 'DAILY_PAUSED', lockedOutUntil: { lte: now } },
       select: { id: true },
     });
-    // A daily pause lifts on the session roll; a trailing breach does not.
-    await prisma.tradingAccount.updateMany({
-      where: { tradingStatus: 'DAILY_PAUSED' },
-      data: { tradingStatus: 'ACTIVE', statusReason: null },
+    if (due.length > 0) {
+      await prisma.tradingAccount.updateMany({
+        where: { id: { in: due.map((a) => a.id) } },
+        data: { tradingStatus: 'ACTIVE', statusReason: null, lockedOutUntil: null },
+      });
+    }
+    const stillLocked = await prisma.tradingAccount.count({
+      where: { tradingStatus: 'DAILY_PAUSED', lockedOutUntil: { gt: now } },
     });
-    return `resumed ${accounts.length} daily-paused accounts`;
+    return `resumed ${due.length} accounts, ${stillLocked} still locked until the reopen`;
   },
 };
 

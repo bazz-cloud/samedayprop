@@ -6,6 +6,9 @@ import { getCurrentUser } from '@/server/auth/session';
 import { getDashboardAccount, listAccounts } from '@/server/views/dashboard-view';
 import { Badge, Callout, Card, DataRow, StatusDot } from '@/components/ui';
 import { PayoutRequestForm } from '@/components/PayoutRequestForm';
+import { ResetCard, type ResetOfferView } from '@/components/ResetCard';
+import { getResetOffer } from '@/server/services/reset-service';
+import { getConfig } from '@/server/config';
 
 export const metadata: Metadata = { title: 'Your dashboard' };
 export const dynamic = 'force-dynamic';
@@ -29,7 +32,7 @@ function statusWords(status: string): string {
     case 'ACTIVE':
       return 'Active';
     case 'DAILY_PAUSED':
-      return 'Paused until the next session';
+      return 'Locked until the market reopens';
     case 'BREACHED':
       return 'Trading access ended';
     case 'SUSPENDED':
@@ -81,6 +84,25 @@ export default async function DashboardPage({
   const selectedId = accounts.find((a) => a.id === requested)?.id ?? accounts[0]!.id;
   const account = await getDashboardAccount(user.id, selectedId);
   if (!account) redirect('/dashboard');
+
+  // A reset is only offered on an account that can no longer trade.
+  const config = getConfig();
+  const rawOffer =
+    account.tradingStatus === 'ACTIVE' ? null : await getResetOffer(user.id, selectedId);
+  const resetOffer: ResetOfferView | null = rawOffer
+    ? {
+        tradingAccountId: rawOffer.tradingAccountId,
+        planLabel: rawOffer.planLabel,
+        price: rawOffer.price.format(),
+        newAccountPrice: rawOffer.newAccountPrice.format(),
+        saving: rawOffer.saving.format(),
+        allowed: rawOffer.allowed,
+        reason: rawOffer.reason,
+        resetCount: rawOffer.resetCount,
+        idempotencyKey: randomUUID(),
+        isDemo: config.isDemo,
+      }
+    : null;
 
   const exposurePercent =
     account.exposureCap > 0
@@ -169,6 +191,21 @@ export default async function DashboardPage({
             </p>
           </div>
         </div>
+
+        {account.isLockedOut && account.lockedOutUntil && (
+          <div className="mt-4">
+            <Callout tone="warn" title="Locked out until the market reopens">
+              You reached your daily loss limit. Trading is locked until the Globex reopen at{' '}
+              {new Date(account.lockedOutUntil).toLocaleString('en-US', {
+                timeZone: 'America/New_York',
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}{' '}
+              ET. Your daily allowance refreshes at the session roll an hour earlier, but the
+              market is closed until then.
+            </Callout>
+          </div>
+        )}
 
         {account.dataStale && (
           <div className="mt-4">
@@ -267,9 +304,9 @@ export default async function DashboardPage({
                 hint="Realized and unrealized, after costs, excluding any withdrawal."
               />
               <DataRow
-                label="Trailing threshold"
+                label="Max drawdown threshold"
                 value={account.trailingThreshold.display}
-                hint="Equity touching this ends trading access. It never moves down."
+                hint="Equity touching this is a maximum drawdown breach and ends trading access. It never moves down."
               />
               <DataRow
                 label="Room above threshold"
@@ -381,6 +418,47 @@ export default async function DashboardPage({
               withdrawal.
             </p>
 
+            {/* Progress toward the first payout: the question every new trader
+                actually has, answered before the limits that gate it. */}
+            {!account.firstWithdrawal.reached && (
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-fg-muted">Progress to your first payout</span>
+                  <span className="tnum">{account.firstWithdrawal.percent}%</span>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-valuenow={account.firstWithdrawal.percent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Progress toward your first payout"
+                  className="h-2 rounded-full bg-surface-raised overflow-hidden"
+                >
+                  <div
+                    className="h-full bg-accent"
+                    style={{ width: `${account.firstWithdrawal.percent}%` }}
+                  />
+                </div>
+                <p className="text-xs text-fg-subtle mt-1.5 leading-relaxed">
+                  <span className="text-fg tnum">{account.firstWithdrawal.remaining.display}</span>{' '}
+                  more profit reaches{' '}
+                  <span className="text-fg tnum">{account.firstWithdrawal.targetBalance.display}</span>,
+                  where your first {account.minimumGross.display} gross withdrawal becomes available.
+                </p>
+              </div>
+            )}
+
+            <div className="mb-4 flex items-center gap-2">
+              <Badge tone={account.firstWithdrawal.bufferMet ? 'accent' : 'neutral'}>
+                {account.firstWithdrawal.bufferMet ? 'Buffer met' : 'Buffer not met'}
+              </Badge>
+              <span className="text-xs text-fg-subtle">
+                {account.firstWithdrawal.bufferMet
+                  ? `Your profit covers the ${account.retainedBuffer.display} retained buffer.`
+                  : `${account.retainedBuffer.display} of profit stays in the account before any payout.`}
+              </span>
+            </div>
+
             <dl className="mb-4">
               <DataRow
                 label="Available gross"
@@ -432,6 +510,8 @@ export default async function DashboardPage({
               </Callout>
             )}
           </Card>
+
+          {resetOffer && <ResetCard offer={resetOffer} />}
 
           <Card className="p-5">
             <h2 className="font-semibold mb-3">Payout history</h2>

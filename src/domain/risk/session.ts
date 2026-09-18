@@ -33,6 +33,18 @@ export const DEFAULT_SESSION_CONFIG: Governed<SessionConfig> = proposed(
   'Build prompt §6 — "Define session boundary in an IANA timezone ... and an approved exchange/instrument calendar"',
 );
 
+/**
+ * Globex reopen, in the session timezone.
+ *
+ * This is when a daily-loss lockout lifts. It is deliberately NOT the session
+ * boundary: the session rolls at 17:00 and refreshes the daily allowance, the
+ * market reopens an hour later at 18:00, and only then can the trader place an
+ * order. Two clocks for two different jobs, an hour apart, matching the CME
+ * maintenance window between the close and the reopen.
+ */
+export const GLOBEX_REOPEN_HOUR = 18;
+export const GLOBEX_REOPEN_MINUTE = 0;
+
 export interface ZonedParts {
   readonly year: number;
   /** 1-12. */
@@ -194,4 +206,42 @@ export function isSameSession(a: Date, b: Date, config: SessionConfig): boolean 
 /** Length of a session in milliseconds. Differs by an hour across DST changes. */
 export function sessionLengthMs(sessionDate: SessionDate, config: SessionConfig): number {
   return sessionEndInstant(sessionDate, config).getTime() - sessionStartInstant(sessionDate, config).getTime();
+}
+
+/**
+ * The next Globex reopen strictly after `instant`.
+ *
+ * Used for daily-loss lockouts: breach at 11:00 and the account is locked until
+ * 18:00 the same evening; breach at 20:00 and it lifts at 18:00 the next day,
+ * because that is genuinely the next reopen.
+ *
+ * Weekends are not skipped here. Whether a Friday breach should lift on
+ * Saturday evening or hold to Sunday's actual reopen depends on the approved
+ * exchange calendar, which has not been supplied — see docs/DECISIONS.md.
+ * Inventing a weekend rule would invent a penalty the owner has not specified.
+ */
+export function nextMarketOpen(instant: Date, config: SessionConfig): Date {
+  const local = zonedParts(instant, config.timeZone);
+  const minutesNow = local.hour * 60 + local.minute;
+  const openMinutes = GLOBEX_REOPEN_HOUR * 60 + GLOBEX_REOPEN_MINUTE;
+
+  const target =
+    minutesNow < openMinutes
+      ? { year: local.year, month: local.month, day: local.day }
+      : addDays(local.year, local.month, local.day, 1);
+
+  return instantFromZoned(
+    target.year,
+    target.month,
+    target.day,
+    GLOBEX_REOPEN_HOUR,
+    GLOBEX_REOPEN_MINUTE,
+    config.timeZone,
+  );
+}
+
+/** True when a lockout set at `lockedUntil` has expired. */
+export function lockoutHasLifted(lockedUntil: Date | null, now: Date = new Date()): boolean {
+  if (!lockedUntil) return true;
+  return now.getTime() >= lockedUntil.getTime();
 }

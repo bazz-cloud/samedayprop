@@ -24,12 +24,60 @@ import {
   sessionTradingPnl,
 } from '@/domain/risk/daily-loss';
 import { traderFacingStatus, type ProvisioningState } from '@/domain/provisioning/state-machine';
+import { MINIMUM_GROSS_WITHDRAWAL } from '@/domain/catalog/plans';
+import { lockoutHasLifted } from '@/domain/risk/session';
+
+/**
+ * Progress toward the first payout.
+ *
+ * The climb is measured from the STARTING balance to the point where the
+ * minimum gross withdrawal first becomes available, which is starting + buffer
+ * + minimum. Measuring from zero would put every account at 95% on day one and
+ * tell the trader nothing.
+ */
+function firstWithdrawalProgress(
+  balance: Money,
+  startingBalance: Money,
+  retainedBuffer: Money,
+  minimumGross: Money,
+): FirstWithdrawalProgress {
+  const target = startingBalance.plus(retainedBuffer).plus(minimumGross);
+  const climbed = balance.minus(startingBalance);
+  const total = target.minus(startingBalance);
+  const remaining = target.minus(balance);
+
+  const percent =
+    total.minor <= 0n
+      ? 100
+      : Math.max(0, Math.min(100, Number((climbed.minor * 100n) / total.minor)));
+
+  return {
+    targetBalance: serialiseMoney(target),
+    remaining: serialiseMoney(remaining.isNegative() ? Money.zero() : remaining),
+    percent,
+    // The buffer is met once profit covers the buffer itself, which happens
+    // before the minimum withdrawal is reachable.
+    bufferMet: balance.gte(startingBalance.plus(retainedBuffer)),
+    reached: balance.gte(target),
+  };
+}
 
 export interface AccountSummary {
   readonly id: string;
   readonly label: string;
   readonly tradingStatus: string;
   readonly provisioningState: string;
+}
+
+export interface FirstWithdrawalProgress {
+  /** Balance at which the first payout becomes available. */
+  readonly targetBalance: SerialisedMoney;
+  /** How much more profit is needed. Zero once reached. */
+  readonly remaining: SerialisedMoney;
+  /** 0-100. How far through the climb from starting balance to target. */
+  readonly percent: number;
+  readonly bufferMet: boolean;
+  readonly reached: boolean;
 }
 
 export interface DashboardAccount {
@@ -71,6 +119,10 @@ export interface DashboardAccount {
   readonly positions: { symbol: string; signedQuantity: number }[];
 
   readonly retainedBuffer: SerialisedMoney;
+  readonly firstWithdrawal: FirstWithdrawalProgress;
+  readonly lockedOutUntil: string | null;
+  readonly isLockedOut: boolean;
+  readonly resetCount: number;
 
   // Cash figures. Real money.
   readonly payoutEligible: boolean;
@@ -226,6 +278,15 @@ export async function getDashboardAccount(
       : [],
 
     retainedBuffer: serialiseMoney(rules.retainedBuffer),
+    firstWithdrawal: firstWithdrawalProgress(
+      Money.fromMinor(account.balanceMinor),
+      Money.fromMinor(account.startingBalanceMinor),
+      rules.retainedBuffer,
+      MINIMUM_GROSS_WITHDRAWAL.value,
+    ),
+    lockedOutUntil: account.lockedOutUntil?.toISOString() ?? null,
+    isLockedOut: !lockoutHasLifted(account.lockedOutUntil, new Date()),
+    resetCount: account.resetCount,
 
     payoutEligible: view.capacity.eligible && !view.lifetimeCapBlocked,
     payoutBinding: view.capacity.binding,

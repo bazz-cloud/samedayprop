@@ -123,19 +123,21 @@ function buildPlanView(plan: PlanDefinition): PlanView {
       value: plan.dailyLossLimit.value.format(),
       detail:
         'Measured on session trading results including unrealized profit and loss and modelled ' +
-        'costs. Reaching it flattens your positions and pauses trading until the next session. ' +
+        'costs. Reaching it flattens your positions and locks trading until the market reopens ' +
+        'at 18:00 ET, an hour after the session roll that refreshes your allowance. ' +
         'A withdrawal reduces your balance but is not counted as a trading loss.',
       status: plan.dailyLossLimit.status,
     },
     {
-      label: 'Intraday trailing drawdown',
+      label: 'Maximum drawdown (intraday trailing)',
       value: plan.drawdownAllowance.value.format(),
       detail:
         'Your threshold follows your highest observed equity through the day, INCLUDING ' +
         'unrealized gains on open positions. It never moves back down after a loss or a ' +
         `withdrawal. It stops rising once it reaches ${plan.startingBalance
           .plus(TRAILING_STOP_OFFSET.value)
-          .format()}. Equity touching the threshold ends trading access on this account.`,
+          .format()}. Equity touching the threshold is a maximum drawdown breach and ends trading ` +
+        'access on this account.',
       status: plan.drawdownAllowance.status,
     },
     {

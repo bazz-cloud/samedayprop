@@ -38,7 +38,7 @@ describe('intraday trailing drawdown', () => {
   it('starts at S - D', () => {
     const state = initialTrailingState(params);
     expect(state.highWater.toDecimalString()).toBe('50000.00');
-    expect(state.threshold.toDecimalString()).toBe('48000.00');
+    expect(state.threshold.toDecimalString()).toBe('48200.00');
     expect(state.thresholdIsCapped).toBe(false);
   });
 
@@ -47,7 +47,7 @@ describe('intraday trailing drawdown', () => {
     // Open position marks up to 50,800 without being closed.
     state = applyEquityObservation(params, state, usd('50800.00'));
     expect(state.highWater.toDecimalString()).toBe('50800.00');
-    expect(state.threshold.toDecimalString()).toBe('48800.00');
+    expect(state.threshold.toDecimalString()).toBe('49000.00');
   });
 
   it('never lowers the threshold when the peak is given back', () => {
@@ -57,7 +57,7 @@ describe('intraday trailing drawdown', () => {
     state = applyEquityObservation(params, state, usd('50100.00'));
     expect(state.highWater.toDecimalString()).toBe('51500.00');
     expect(state.threshold.equals(peakThreshold)).toBe(true);
-    expect(state.threshold.toDecimalString()).toBe('49500.00');
+    expect(state.threshold.toDecimalString()).toBe('49700.00');
   });
 
   it('stops rising at starting balance + $100', () => {
@@ -93,9 +93,9 @@ describe('intraday trailing drawdown', () => {
 
   it('breaches when equity touches the threshold, not only when it goes below', () => {
     const state = initialTrailingState(params);
-    expect(isTrailingBreached(state, usd('48000.01'))).toBe(false);
-    expect(isTrailingBreached(state, usd('48000.00'))).toBe(true);
-    expect(isTrailingBreached(state, usd('47999.99'))).toBe(true);
+    expect(isTrailingBreached(state, usd('48200.01'))).toBe(false);
+    expect(isTrailingBreached(state, usd('48200.00'))).toBe(true);
+    expect(isTrailingBreached(state, usd('48199.99'))).toBe(true);
   });
 
   it('is monotonic under an arbitrary equity walk', () => {
@@ -113,14 +113,14 @@ describe('intraday trailing drawdown', () => {
   });
 
   it('computes the threshold as min(S + stop, H - D)', () => {
-    expect(computeThreshold(params, usd('50000.00')).toDecimalString()).toBe('48000.00');
-    expect(computeThreshold(params, usd('51000.00')).toDecimalString()).toBe('49000.00');
+    expect(computeThreshold(params, usd('50000.00')).toDecimalString()).toBe('48200.00');
+    expect(computeThreshold(params, usd('51000.00')).toDecimalString()).toBe('49200.00');
     expect(computeThreshold(params, usd('60000.00')).toDecimalString()).toBe('50100.00');
   });
 });
 
 describe('daily loss limit', () => {
-  const limit = plan.dailyLossLimit.value; // $700
+  const limit = plan.dailyLossLimit.value; // $595
 
   it('measures realized plus unrealized session P&L', () => {
     const state = openSession('2026-01-15', usd('50000.00'));
@@ -131,7 +131,7 @@ describe('daily loss limit', () => {
   it('reports zero usage while the session is profitable', () => {
     const state = openSession('2026-01-15', usd('50000.00'));
     expect(dailyLossUsed(state, usd('50450.00')).isZero()).toBe(true);
-    expect(dailyLossRemaining(state, usd('50450.00'), limit).toDecimalString()).toBe('700.00');
+    expect(dailyLossRemaining(state, usd('50450.00'), limit).toDecimalString()).toBe('595.00');
   });
 
   it('EXCLUDES withdrawal deductions from daily trading P&L', () => {
@@ -153,13 +153,13 @@ describe('daily loss limit', () => {
     const equityAfter = usd('50200.00');
     expect(sessionTradingPnl(state, equityAfter).toDecimalString()).toBe('-300.00');
     expect(dailyLossUsed(state, equityAfter).toDecimalString()).toBe('300.00');
-    expect(dailyLossRemaining(state, equityAfter, limit).toDecimalString()).toBe('400.00');
+    expect(dailyLossRemaining(state, equityAfter, limit).toDecimalString()).toBe('295.00');
   });
 
   it('breaches when the loss reaches the limit exactly', () => {
     const state = openSession('2026-01-15', usd('50000.00'));
-    expect(isDailyLossBreached(state, usd('49300.01'), limit)).toBe(false);
-    expect(isDailyLossBreached(state, usd('49300.00'), limit)).toBe(true);
+    expect(isDailyLossBreached(state, usd('49405.01'), limit)).toBe(false);
+    expect(isDailyLossBreached(state, usd('49405.00'), limit)).toBe(true);
   });
 
   it('does not double-count commissions already reflected in equity', () => {
@@ -178,7 +178,7 @@ describe('daily loss limit', () => {
     expect(dailyLossUsed(day1, usd('49400.00')).toDecimalString()).toBe('600.00');
     const day2 = openSession('2026-01-16', usd('49400.00'));
     expect(dailyLossUsed(day2, usd('49400.00')).isZero()).toBe(true);
-    expect(dailyLossRemaining(day2, usd('49400.00'), limit).toDecimalString()).toBe('700.00');
+    expect(dailyLossRemaining(day2, usd('49400.00'), limit).toDecimalString()).toBe('595.00');
   });
 });
 

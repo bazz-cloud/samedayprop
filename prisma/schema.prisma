@@ -342,7 +342,9 @@ model OrderItem {
   id               String @id @default(cuid())
   orderId          String
   order            Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  kind             String // ACCOUNT_PLAN | ADDON
+  kind             String // ACCOUNT_PLAN | ADDON | ACCOUNT_RESET
+  /// Set only on an ACCOUNT_RESET line: the account being reset.
+  targetTradingAccountId String?
   itemKey          String
   name             String
   quantity         Int    @default(1)
@@ -482,9 +484,20 @@ model TradingAccount {
   breachedAt        DateTime?
   breachReason      String?
 
+  /// Set when the daily loss limit is hit. Trading stays blocked until this
+  /// instant (the next NA pre-market open), which is LATER than the session
+  /// roll that refreshes the daily allowance.
+  lockedOutUntil    DateTime?
+
+  /// Number of times this account has been reset back to its starting state.
+  resetCount        Int      @default(0)
+  lastResetAt       DateTime?
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  credential        PlatformCredential?
+  resets            AccountReset[]
   providerEvents    ProviderEvent[]
   equityCheckpoints EquityCheckpoint[]
   positionSnapshots PositionSnapshot[]
@@ -918,4 +931,66 @@ model ProductRiskConfig {
   updatedAt                  DateTime @updatedAt
 
   @@index([nettingGroup])
+}
+
+/// A paid reset returning an account to its starting state.
+///
+/// Append-only. A reset restores the simulated balance and clears the breach,
+/// but deliberately does NOT restore consumed lifetime payout capacity — the
+/// cap is a lifetime obligation per account, and letting a $10-cheaper reset
+/// clear it would make the cap meaningless.
+model AccountReset {
+  id               String   @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+  orderId          String
+  /// State immediately before the reset, for audit.
+  previousStatus   String
+  previousBalanceMinor BigInt
+  previousThresholdMinor BigInt
+  previousHighWaterMinor BigInt
+  /// State restored to.
+  restoredBalanceMinor BigInt
+  restoredThresholdMinor BigInt
+  priceMinor       BigInt
+  reason           String
+  idempotencyKey   String   @unique
+  createdAt        DateTime @default(now())
+
+  @@index([tradingAccountId, createdAt])
+}
+
+/// Trading platform credentials issued to a trader.
+///
+/// The username is not a secret and is displayed for the life of the account.
+/// The password is NOT retrievable: only a hash is kept. The initial secret is
+/// held encrypted at rest solely so the trader can read it once, and that
+/// ciphertext is destroyed the moment they confirm they have saved it. Losing
+/// it means re-issuing a new one, never recovering the old one.
+model PlatformCredential {
+  id               String   @id @default(cuid())
+  tradingAccountId String   @unique
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+
+  username         String   @unique
+  /// scrypt hash of the current password. The only durable record of it.
+  passwordHash     String
+  passwordSalt     String
+  passwordParams   String
+
+  /// AES-256-GCM ciphertext of the initial password, purged on acknowledgement.
+  initialSecretCipher String?
+  initialSecretIv     String?
+  initialSecretTag    String?
+
+  /// Set when the trader confirms they have saved it; ciphertext purged then.
+  acknowledgedAt   DateTime?
+  /// The platform must force a change on first sign-in.
+  mustChangeOnFirstUse Boolean @default(true)
+  reissueCount     Int      @default(0)
+  lastIssuedAt     DateTime @default(now())
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+
+  @@index([tradingAccountId])
 }

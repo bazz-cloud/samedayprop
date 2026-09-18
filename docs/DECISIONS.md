@@ -65,26 +65,32 @@ The $75,000 account was withdrawn by the owner. Its published plan version is
 RETIRED rather than deleted, so any order that pointed at it still resolves to
 the exact terms that were sold.
 
-| Account | Drawdown allowance | Daily loss limit | Retained buffer | Daily cash cap |
+| Account | Max drawdown | Daily loss limit | Retained buffer | Daily cash cap |
 |---|---:|---:|---:|---:|
-| $25K | $1,000 | $400 | $1,000 | $1,000 *(confirmed)* |
-| $50K | $2,000 | $700 | $2,000 | $1,500 |
-| $100K | $3,000 | $1,000 | $3,000 | $2,500 |
-| $150K | $4,500 | $1,500 | $4,500 | $3,000 |
-| $300K | $7,500 | $2,500 | $7,500 | $4,000 |
+| $25K | $900 | $340 | $1,000 | $1,000 *(confirmed)* |
+| $50K | $1,800 | $595 | $2,000 | $1,500 |
+| $100K | $2,700 | $850 | $3,000 | $2,500 |
+| $150K | $4,050 | $1,275 | $4,500 | $3,000 |
+| $300K | $6,750 | $2,125 | $7,500 | $4,000 |
+
+Owner decision: daily loss limits were cut 15% and max drawdown 10% from the
+earlier figures. Both land on whole dollars at every account size.
 
 Other proposed defaults:
 
 | Item | Proposed value | Note |
 |---|---|---|
 | Trailing stop point | Starting balance + $100 | Configurable and versioned. |
-| Daily loss consequence | Flatten positions, pause trading until next session | |
-| Trailing breach consequence | Terminate trading access on that account | |
+| Daily loss consequence | Flatten positions, lock trading until the Globex reopen at 18:00 ET | |
+| Max drawdown breach | Terminate trading access on that account; a paid reset is the way back | |
 | Accounts per person | One active account per verified person, pilot only | |
 | Overnight positions | Not permitted in the pilot | Session times need exchange-calendar approval. |
 | Session boundary | 17:00 America/New_York | DST-correct; holiday calendar NOT yet approved. |
 | Mini/micro conversion | 10 micro-equivalents per mini | Per-product controls required; equal dollar risk is never assumed. |
 | Coupon code | `START25` | Name, validity window and use limits all configurable. |
+| Daily-loss lockout expiry | Globex reopen, 18:00 ET | An hour after the 17:00 session roll that refreshes the allowance. Weekend behaviour needs the approved exchange calendar. |
+| Account reset price | List price &minus; $10 | Confirmed by the owner. |
+| Reset restores | Starting balance, high-water and threshold | Consumed lifetime payout capacity and payout history are NOT restored. |
 | Gross withdrawal increment | $1.00 | Derived control: keeps the 50/50 split free of fractional cents. |
 | Post-withdrawal room | $0.01 above the trailing threshold | Derived control: a payout must not be what trips a breach. |
 | Add-on prices | $19 / $29 / $49 | Candidate products; none approved for sale. |

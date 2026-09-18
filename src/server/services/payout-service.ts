@@ -35,7 +35,7 @@ import {
   mayReverseSimulatedDeduction,
   type PayoutState,
 } from '@/domain/payout/state-machine';
-import { DEFAULT_SESSION_CONFIG, sessionDateFor } from '@/domain/risk/session';
+import { DEFAULT_SESSION_CONFIG, lockoutHasLifted, sessionDateFor } from '@/domain/risk/session';
 import { buildObligationEntry, buildPayoutEntries } from '@/domain/ledger/entries';
 import { lifetimeCapForPayout, toRuleSnapshot } from './catalog-service';
 import { postEntries, postEntry } from './ledger-service';
@@ -147,7 +147,9 @@ export async function getPayoutView(tradingAccountId: string): Promise<PayoutVie
   const preconditions: RequestPreconditions = {
     isFlat: parsedPositions.every((p) => p.signedQuantity === 0),
     hasConflictingOrders: parsedOrders.length > 0,
-    accountIsActive: account.tradingStatus === 'ACTIVE',
+    accountIsActive:
+      account.tradingStatus === 'ACTIVE' &&
+      lockoutHasLifted(account.lockedOutUntil, new Date()),
     dataIsStale: account.dataStale || staleByClock,
   };
 

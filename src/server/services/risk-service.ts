@@ -32,7 +32,7 @@ import {
   sessionTradingPnl,
   type DailyLossState,
 } from '@/domain/risk/daily-loss';
-import { DEFAULT_SESSION_CONFIG, sessionDateFor } from '@/domain/risk/session';
+import { DEFAULT_SESSION_CONFIG, nextMarketOpen, sessionDateFor } from '@/domain/risk/session';
 import { computeExposure, ceilingToMicroEquivalents, type ProductSpec } from '@/domain/risk/exposure';
 import { toRuleSnapshot } from './catalog-service';
 import { getTradingProvider } from '@/server/providers/registry';
@@ -365,10 +365,15 @@ async function enforceBreach(
   if (existing) return;
 
   const provider = getTradingProvider();
+  // A daily-loss lockout runs to the next Globex reopen, which is an hour
+  // after the session roll that refreshes the allowance.
+  const lockedOutUntil =
+    breach === 'DAILY_LOSS' ? nextMarketOpen(new Date(), DEFAULT_SESSION_CONFIG.value) : null;
+
   const reason =
     breach === 'TRAILING'
-      ? `Account equity ${snapshot.equity.format()} reached the trailing threshold ${threshold.format()}. Trading access is terminated for this account.`
-      : `Session trading loss reached the daily limit. Positions are being flattened and trading is paused until the next session.`;
+      ? `Account equity ${snapshot.equity.format()} reached the maximum drawdown threshold ${threshold.format()}. Trading access is terminated for this account.`
+      : `Session trading loss reached the daily limit. Positions are being flattened and trading is locked until the market reopens at ${lockedOutUntil!.toISOString()}.`;
 
   let flatten = { requested: true as const, confirmed: false, detail: 'not attempted', providerRef: null as string | null };
   let disable = { requested: true as const, confirmed: false, detail: 'not attempted', providerRef: null as string | null };
@@ -424,7 +429,9 @@ async function enforceBreach(
       data: {
         tradingStatus: breach === 'TRAILING' ? 'BREACHED' : 'DAILY_PAUSED',
         statusReason: reason,
-        ...(breach === 'TRAILING' ? { breachedAt: new Date(), breachReason: reason } : {}),
+        ...(breach === 'TRAILING'
+          ? { breachedAt: new Date(), breachReason: reason }
+          : { lockedOutUntil }),
       },
     });
   });

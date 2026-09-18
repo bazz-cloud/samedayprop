@@ -26,6 +26,7 @@ import { getTradingProvider } from '@/server/providers/registry';
 import { requireCapability } from '@/server/providers/trading/types';
 import { toRuleSnapshot } from './catalog-service';
 import { recordAudit } from './audit-service';
+import { issueCredential } from './credential-service';
 import { enqueueJob } from '@/server/jobs/queue';
 
 type Tx = Prisma.TransactionClient;
@@ -237,6 +238,10 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
       data: { tradingStatus: 'ACTIVE', statusReason: null },
     });
     await prisma.order.update({ where: { id: orderId }, data: { status: 'FULFILLED' } });
+
+    // Credentials are issued only once the account is genuinely tradeable, so a
+    // trader never holds a sign-in for an account that does not exist yet.
+    await issueCredential(account.id);
 
     await recordAudit({
       actorId: null,

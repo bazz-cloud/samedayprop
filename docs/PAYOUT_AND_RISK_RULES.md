@@ -70,11 +70,11 @@ T = min(S + stopOffset, H − D)          stopOffset = $100 (PROPOSED)
 - **Breach condition: `equity ≤ T`.** Touching the threshold is a breach, not
   only falling below it.
 
-Worked example ($50K, D = $2,000):
+Worked example ($50K, D = $1,800):
 
 | Event | Equity | H | T | Room |
 |---|---:|---:|---:|---:|
-| Open | 50,000 | 50,000 | 48,000 | 2,000 |
+| Open | 50,000 | 50,000 | 48,200 | 1,800 |
 | Unrealized peak | 52,500 | 52,500 | **50,100** (capped) | 2,400 |
 | Gives back | 50,100 | 52,500 | 50,100 | 0 |
 | Withdraws $500 gross | 52,000 | 52,500 | 50,100 | **1,900** |
@@ -97,8 +97,18 @@ profitable account.
 Commissions and fees are already inside `currentEquity` and are **never
 subtracted a second time**.
 
-Consequence (PROPOSED): flatten positions, pause trading until the next session.
-The pause lifts on the session roll; a trailing breach does not.
+Consequence: flatten positions and LOCK trading until the Globex reopen at
+18:00 ET. Note the two clocks, an hour apart and doing different jobs:
+
+  17:00 ET  session rolls — the daily loss allowance refreshes
+  18:00 ET  market reopens — the lockout lifts and orders can be placed
+
+The hour between is the CME maintenance window, so a trader has a fresh
+allowance slightly before they can use it. `lockedOutUntil` on the account is
+the authority; the session roll alone does not resume a locked account.
+
+A maximum drawdown breach never lifts on any clock. That account is terminated
+and the only way back is a paid reset.
 
 ### 3.3 Position exposure
 
@@ -281,3 +291,53 @@ $250 — and **zero** revenue entries. Asserted in `tests/ledger.test.ts`.
 Corrections are **compensating entries** referencing the original, never edits.
 Every entry carries an idempotency key (UNIQUE), the actor, the reason, the
 policy version and its references.
+
+
+---
+
+## 6. Account resets
+
+A breached account can be restored for its plan's list price minus $10.
+
+```
+reset price = list price − $10
+```
+
+A reset restores the simulated balance, the high-water mark and the threshold to
+their opening values, clears the breach and any lockout, and returns the account
+to ACTIVE. It is the one place in the system where the threshold legitimately
+moves DOWN, and only because the trader has bought a new starting position.
+
+**What a reset does NOT restore:**
+
+| | |
+|---|---|
+| Consumed lifetime payout capacity | Survives. The cap is an obligation ceiling per account; letting the cheapest purchase in the catalog clear it would make it meaningless. |
+| Payout history | Survives. A reset is not a way to erase a record. |
+| Platform credentials | Survive. The trader keeps their sign-in. |
+
+Resets are refused while a payout is in flight: a reset rewrites the very
+balance a pending request was validated against, and the two settling in either
+order would produce a payout measured against a balance that no longer exists.
+
+Application is idempotent on the order, so a retry after a timeout cannot reset
+twice. The provider is told first: if the simulated balance cannot be moved
+there, our records do not claim it was.
+
+---
+
+## 7. Platform credentials
+
+Issued when an account becomes tradeable, never before.
+
+| | |
+|---|---|
+| Username | Not a secret. Displayed permanently. |
+| Password | Stored ONLY as a scrypt hash. |
+| Initial secret | Held as AES-256-GCM ciphertext solely so the trader can read it once; destroyed the moment they confirm they have saved it. |
+| Lost password | Re-issued, never recovered. Re-issuing rotates it. |
+
+A permanently readable password would mean holding a credential we have no need
+to hold, and a database leak would hand over every trader's platform account at
+once. Production must set `CREDENTIAL_ENCRYPTION_KEY`; reusing the session
+secret couples two key rotations that should be independent.

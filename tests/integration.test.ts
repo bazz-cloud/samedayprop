@@ -556,7 +556,7 @@ describe('risk ingestion', () => {
 
     const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
     expect(account.tradingStatus).toBe('BREACHED');
-    expect(account.breachReason).toMatch(/trailing threshold/);
+    expect(account.breachReason).toMatch(/maximum drawdown threshold/);
 
     const event = await prisma.riskEvent.findFirst({
       where: { tradingAccountId: accountId, eventType: 'TRAILING_BREACH' },
@@ -1009,6 +1009,117 @@ describe('coupon usage under concurrency', () => {
     expect(later.couponRejection).toMatch(/already used/);
     // And the quote is priced at full list, not silently discounted anyway.
     expect(later.quote.total.toDecimalString()).toBe('349.00');
+  });
+});
+
+describe('a paid reset', () => {
+  it('restores the starting balance but NOT consumed lifetime payout capacity', async () => {
+    const { userId, accountId, externalAccountId } = await provisionAccount();
+    const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    await prisma.planVersion.update({
+      where: { id: account.planVersionId },
+      data: { lifetimeCapKind: 'APPROVED_AMOUNT', lifetimeCapMinor: usd('3000.00').minor },
+    });
+
+    // Take a payout so there is lifetime capacity to lose.
+    await ingestSnapshot(accountId, snapshotAt(externalAccountId, '52500.00', 80n));
+    const payout = await requestPayout({
+      userId,
+      tradingAccountId: accountId,
+      gross: usd('500.00'),
+      idempotencyKey: `reset-payout-${accountId}`,
+    });
+    await validateAndApprove(payout.payoutRequestId);
+    await submitPayout(payout.payoutRequestId);
+    await markPayoutPaid({
+      payoutRequestId: payout.payoutRequestId,
+      paymentProvider: 'manual',
+      paymentRef: 'ref',
+      actor: 'test',
+    });
+
+    const before = await getPayoutView(accountId);
+    expect(before.context.remainingLifetimeCash?.toDecimalString()).toBe('2750.00');
+
+    // Breach the account, then reset it.
+    await prisma.tradingAccount.update({
+      where: { id: accountId },
+      data: { tradingStatus: 'BREACHED', dataStale: false },
+    });
+
+    const { applyReset } = await import('@/server/services/reset-service');
+    const order = await prisma.order.create({
+      data: {
+        userId,
+        quoteId: account.orderId ? (await prisma.order.findUniqueOrThrow({ where: { id: account.orderId } })).quoteId : '',
+        planVersionId: account.planVersionId,
+        status: 'PAID',
+        subtotalMinor: usd('589.00').minor,
+        discountMinor: 0n,
+        taxMinor: 0n,
+        totalMinor: usd('589.00').minor,
+        termsSnapshot: '{}',
+        termsHash: 'reset',
+        idempotencyKey: `reset-order-${accountId}`,
+      },
+    });
+    const result = await applyReset({ userId, tradingAccountId: accountId, orderId: order.id });
+    expect(result.applied).toBe(true);
+
+    const after = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    expect(Money.fromMinor(after.balanceMinor).toDecimalString()).toBe('50000.00');
+    expect(after.tradingStatus).toBe('ACTIVE');
+    expect(after.breachReason).toBeNull();
+    expect(after.resetCount).toBe(1);
+
+    // The point of the test: capacity already spent is still spent.
+    const afterView = await getPayoutView(accountId);
+    expect(afterView.context.remainingLifetimeCash?.toDecimalString()).toBe('2750.00');
+
+    // And the payout record survives.
+    expect(await prisma.payoutRequest.count({ where: { tradingAccountId: accountId } })).toBe(1);
+  });
+
+  it('is idempotent on the order', async () => {
+    const { userId, accountId } = await provisionAccount();
+    await prisma.tradingAccount.update({
+      where: { id: accountId },
+      data: { tradingStatus: 'BREACHED', balanceMinor: usd('48000.00').minor, dataStale: false },
+    });
+    const acc = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    const order = await prisma.order.create({
+      data: {
+        userId,
+        quoteId: (await prisma.order.findUniqueOrThrow({ where: { id: acc.orderId } })).quoteId,
+        planVersionId: acc.planVersionId,
+        status: 'PAID',
+        subtotalMinor: usd('589.00').minor,
+        discountMinor: 0n, taxMinor: 0n, totalMinor: usd('589.00').minor,
+        termsSnapshot: '{}', termsHash: 'reset',
+        idempotencyKey: `reset-dup-${accountId}`,
+      },
+    });
+    const { applyReset } = await import('@/server/services/reset-service');
+    expect((await applyReset({ userId, tradingAccountId: accountId, orderId: order.id })).applied).toBe(true);
+    expect((await applyReset({ userId, tradingAccountId: accountId, orderId: order.id })).applied).toBe(false);
+    const after = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    expect(after.resetCount).toBe(1);
+  });
+
+  it('refuses to reset an account that is still active', async () => {
+    const { userId, accountId } = await provisionAccount();
+    const { getResetOffer } = await import('@/server/services/reset-service');
+    const offer = await getResetOffer(userId, accountId);
+    expect(offer?.allowed).toBe(false);
+    expect(offer?.reason).toMatch(/still active/);
+  });
+
+  it('prices the reset $10 below the account', async () => {
+    const { userId, accountId } = await provisionAccount();
+    const { getResetOffer } = await import('@/server/services/reset-service');
+    const offer = await getResetOffer(userId, accountId);
+    expect(offer?.price.toDecimalString()).toBe('589.00');
+    expect(offer?.saving.toDecimalString()).toBe('10.00');
   });
 });
 
