@@ -74,7 +74,7 @@ export function allocateByWeight(
   });
   for (const entry of remainders) {
     if (leftover <= 0n) break;
-    base[entry.index] += 1n;
+    base[entry.index] = (base[entry.index] ?? 0n) + 1n;
     leftover -= 1n;
   }
 

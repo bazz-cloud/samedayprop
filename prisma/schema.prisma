@@ -1,3 +1,21 @@
+// Persistence schema.
+//
+// Conventions that hold throughout this file:
+//
+//  * MONEY IS ALWAYS BigInt MINOR UNITS (cents). Never Float, never Decimal-as-
+//    Float. The domain layer converts at the boundary via Money.fromMinor().
+//  * Anything a customer agreed to is SNAPSHOTTED, not referenced. A plan
+//    version, a rule set, a price and a signed document are copied onto the
+//    order so that a later admin edit cannot rewrite an existing contract.
+//  * Every externally-triggered write carries an idempotencyKey with a UNIQUE
+//    constraint, so a duplicate webhook or a retried job cannot double-charge,
+//    double-provision or double-pay.
+//
+// Development uses SQLite so the whole system runs with no external services.
+// Production targets PostgreSQL: swap the provider and the url. The schema
+// avoids SQLite-only constructs; enums are modelled as String columns with
+// TypeScript union types in src/domain and src/server (SQLite has no enums).
+
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -8,7 +26,896 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Probe {
-  id   String @id @default(cuid())
-  name String
+// ---------------------------------------------------------------------------
+// Identity and access
+// ---------------------------------------------------------------------------
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  emailNormalised   String    @unique
+  emailVerifiedAt   DateTime?
+  passwordHash      String
+  passwordSalt      String
+  /// scrypt parameters, stored so a future cost increase can rehash on login.
+  passwordParams    String
+  legalName         String?
+  // Role-based access: OWNER | FINANCE | SUPPORT | RISK | TRADER
+  role              String    @default("TRADER")
+  mfaSecret         String?
+  mfaEnabledAt      DateTime?
+  disabledAt        DateTime?
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  sessions          Session[]
+  verification      CustomerVerification?
+  quotes            Quote[]
+  orders            Order[]
+  tradingAccounts   TradingAccount[]
+  payoutRequests    PayoutRequest[]
+  acceptances       AgreementAcceptance[]
+  entitlements      Entitlement[]
+  couponRedemptions CouponRedemption[]
+  supportTickets    SupportTicket[]
+  notifications     Notification[]
+  auditEvents       AuditEvent[]        @relation("AuditActor")
+
+  @@index([role])
+}
+
+model Session {
+  id           String    @id @default(cuid())
+  /// SHA-256 of the session token. The raw token is never stored.
+  tokenHash    String    @unique
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  /// Retained as signature/security evidence under a defined retention policy.
+  ipAddress    String?
+  userAgent    String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  purpose   String // VERIFY_EMAIL | RESET_PASSWORD
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  @@index([userId, purpose])
+}
+
+model CustomerVerification {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // UNSTARTED | PENDING | VERIFIED | REJECTED | NOT_CONFIGURED
+  status      String    @default("NOT_CONFIGURED")
+  /// Which external identity provider verified this, when one is configured.
+  provider    String?
+  providerRef String?
+  /// ISO country code once an eligibility policy is configured.
+  countryCode String?
+  checkedAt   DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Catalog and versioned rules
+// ---------------------------------------------------------------------------
+
+/// An immutable published version of a plan's commercial and risk terms.
+/// Admin edits create a NEW version; existing orders keep pointing at the old
+/// one so a sold contract is never rewritten.
+model PlanVersion {
+  id                    String   @id @default(cuid())
+  planKey               String // SIM_25K ... SIM_300K
+  version               Int
+  // DRAFT | PUBLISHED | RETIRED
+  status                String   @default("DRAFT")
+
+  label                 String
+  startingBalanceMinor  BigInt
+  listPriceMinor        BigInt
+
+  ceilingMinis          Int
+  ceilingMicros         Int
+  drawdownAllowanceMinor BigInt
+  dailyLossLimitMinor   BigInt
+  retainedBufferMinor   BigInt
+  dailyCashCapMinor     BigInt
+  trailingStopOffsetMinor BigInt
+
+  // UNRESOLVED | APPROVED_AMOUNT | APPROVED_UNCAPPED
+  lifetimeCapKind       String   @default("UNRESOLVED")
+  lifetimeCapMinor      BigInt?
+  lifetimeCapApprovedBy String?
+  lifetimeCapApprovedAt DateTime?
+
+  /// JSON map of field -> CONFIRMED|PROPOSED|EXTERNAL|UNRESOLVED.
+  requirementStatuses   String
+  /// Non-empty means this version may not be sold in production.
+  launchBlockers        String
+  sellableInProduction  Boolean  @default(false)
+
+  publishedAt           DateTime?
+  createdAt             DateTime @default(now())
+
+  orders                Order[]
+  tradingAccounts       TradingAccount[]
+
+  @@unique([planKey, version])
+  @@index([planKey, status])
+}
+
+model Coupon {
+  id                        String   @id @default(cuid())
+  code                      String   @unique
+  percentOff                Int
+  scope                     String // ACCOUNT_PLANS | ADDONS | ALL_ELIGIBLE
+  validFrom                 DateTime?
+  validUntil                DateTime?
+  maxRedemptions            Int?
+  maxRedemptionsPerCustomer Int?
+  stackable                 Boolean  @default(false)
+  active                    Boolean  @default(true)
+  /// Denormalised counter, maintained inside the order transaction.
+  redemptionCount           Int      @default(0)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  redemptions               CouponRedemption[]
+}
+
+model CouponRedemption {
+  id         String   @id @default(cuid())
+  couponId   String
+  coupon     Coupon   @relation(fields: [couponId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  orderId    String   @unique
+  order      Order    @relation(fields: [orderId], references: [id])
+  amountMinor BigInt
+  createdAt  DateTime @default(now())
+
+  /// One redemption per order, enforced above; this pair supports the
+  /// per-customer limit check without a scan.
+  @@index([couponId, userId])
+}
+
+model AddOnVersion {
+  id             String   @id @default(cuid())
+  addOnKey       String
+  version        Int
+  name           String
+  description    String
+  listPriceMinor BigInt
+  deliveryKind   String // download | timed-entitlement | scheduled-session
+  deliveryDays   Int?
+  deliveryMinutes Int?
+  assumedUnitCostMinor BigInt
+  requiresCapacityCheck Boolean @default(false)
+  couponEligible Boolean  @default(true)
+  // DRAFT | PUBLISHED | RETIRED
+  status         String   @default("DRAFT")
+  sellableInProduction Boolean @default(false)
+  createdAt      DateTime @default(now())
+
+  @@unique([addOnKey, version])
+}
+
+/// Real, finite capacity for add-ons that need a human. Sold only against a
+/// slot that actually exists.
+model ServiceSlot {
+  id          String    @id @default(cuid())
+  addOnKey    String
+  startsAt    DateTime
+  endsAt      DateTime
+  capacity    Int       @default(1)
+  bookedCount Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  bookings    ServiceBooking[]
+
+  @@index([addOnKey, startsAt])
+}
+
+model ServiceBooking {
+  id           String      @id @default(cuid())
+  slotId       String
+  slot         ServiceSlot @relation(fields: [slotId], references: [id])
+  userId       String
+  orderId      String
+  entitlementId String?    @unique
+  // RESERVED | CONFIRMED | RELEASED | COMPLETED
+  status       String      @default("RESERVED")
+  createdAt    DateTime    @default(now())
+
+  @@unique([slotId, orderId])
+  @@index([userId])
+}
+
+model Entitlement {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  orderId    String
+  addOnKey   String
+  /// Null for perpetual entitlements such as a download.
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([orderId, addOnKey])
+  @@index([userId, addOnKey])
+}
+
+// ---------------------------------------------------------------------------
+// Quotes, orders, payments
+// ---------------------------------------------------------------------------
+
+model Quote {
+  id             String   @id @default(cuid())
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  planKey        String
+  addOnKeys      String // JSON array
+  couponCode     String?
+
+  subtotalMinor  BigInt
+  discountMinor  BigInt
+  taxMinor       BigInt
+  totalMinor     BigInt
+  taxStatus      String
+  currency       String   @default("USD")
+
+  /// Full serialised quote, including every line. What the customer signs.
+  snapshot       String
+  /// SHA-256 of the canonical form. Binds a signature to exact terms.
+  snapshotHash   String
+  /// Non-empty means this quote cannot be charged in production.
+  productionBlockers String
+
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+  consumedAt     DateTime?
+
+  orders         Order[]
+  acceptances    AgreementAcceptance[]
+
+  @@index([userId])
+  @@index([snapshotHash])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  quoteId       String
+  quote         Quote    @relation(fields: [quoteId], references: [id])
+  planVersionId String
+  planVersion   PlanVersion @relation(fields: [planVersionId], references: [id])
+
+  // PENDING_PAYMENT | PAID | FULFILLED | CANCELED | REFUNDED | PARTIALLY_REFUNDED
+  status        String   @default("PENDING_PAYMENT")
+
+  subtotalMinor BigInt
+  discountMinor BigInt
+  taxMinor      BigInt
+  totalMinor    BigInt
+  currency      String   @default("USD")
+
+  /// Frozen copy of the quote and the rules in force at purchase.
+  termsSnapshot String
+  termsHash     String
+
+  /// Client-supplied key making order creation safe under retries.
+  idempotencyKey String  @unique
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items          OrderItem[]
+  payments       Payment[]
+  refunds        Refund[]
+  couponRedemption CouponRedemption?
+  provisioningJobs ProvisioningJob[]
+  tradingAccounts  TradingAccount[]
+  acceptances      AgreementAcceptance[]
+
+  @@index([userId, status])
+}
+
+model OrderItem {
+  id               String @id @default(cuid())
+  orderId          String
+  order            Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind             String // ACCOUNT_PLAN | ADDON
+  itemKey          String
+  name             String
+  quantity         Int    @default(1)
+  unitListPriceMinor BigInt
+  lineSubtotalMinor  BigInt
+  /// Deterministic share of the order discount. Reused verbatim on refund.
+  lineDiscountMinor  BigInt
+  lineTotalMinor     BigInt
+
+  @@unique([orderId, itemKey])
+}
+
+model Payment {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id])
+  provider       String // mock | (a verified hosted provider)
+  providerMode   String // DEMO | SANDBOX | PRODUCTION
+  /// Provider's own identifier. Unique so a replayed webhook cannot double-post.
+  providerRef    String
+  // REQUIRES_ACTION | PENDING | SUCCEEDED | FAILED | UNKNOWN | REFUNDED
+  status         String   @default("PENDING")
+  amountMinor    BigInt
+  feeMinor       BigInt   @default(0)
+  netMinor       BigInt   @default(0)
+  currency       String   @default("USD")
+  failureReason  String?
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([orderId, status])
+}
+
+model Refund {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id])
+  paymentId      String
+  amountMinor    BigInt
+  reason         String
+  // PENDING | SUCCEEDED | FAILED
+  status         String   @default("PENDING")
+  providerRef    String?
+  requestedBy    String
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+
+  @@index([orderId])
+}
+
+/// Every webhook delivery, stored raw before it is interpreted. Replaying the
+/// log must reproduce current state exactly.
+model WebhookDelivery {
+  id             String   @id @default(cuid())
+  source         String // payments | trading
+  /// Provider's delivery id. UNIQUE: this is the duplicate-webhook guard.
+  externalId     String
+  eventType      String
+  signatureValid Boolean
+  payload        String
+  receivedAt     DateTime @default(now())
+  processedAt    DateTime?
+  processingError String?
+
+  @@unique([source, externalId])
+  @@index([source, processedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Provisioning and trading accounts
+// ---------------------------------------------------------------------------
+
+model ProvisioningJob {
+  id               String   @id @default(cuid())
+  orderId          String
+  order            Order    @relation(fields: [orderId], references: [id])
+  /// State machine in src/domain/provisioning/state-machine.ts.
+  state            String   @default("payment_pending")
+  attempts         Int      @default(0)
+  maxAttempts      Int      @default(5)
+  lastError        String?
+  retryable        Boolean  @default(true)
+  nextAttemptAt    DateTime?
+  /// Provider-side job/request id, when the provider exposes one.
+  externalJobRef   String?
+  /// Read-back evidence that risk limits were actually applied.
+  riskVerification String?
+  idempotencyKey   String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([state, nextAttemptAt])
+}
+
+model TradingAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  orderId           String   @unique
+  order             Order    @relation(fields: [orderId], references: [id])
+  planVersionId     String
+  planVersion       PlanVersion @relation(fields: [planVersionId], references: [id])
+
+  /// External identifier at the trading provider. Unique so a retried
+  /// provisioning call cannot attach two accounts to one order.
+  externalAccountId String?  @unique
+  providerName      String   @default("tradovate")
+  providerMode      String   @default("MOCK") // MOCK | SANDBOX | PRODUCTION
+
+  provisioningState String   @default("payment_pending")
+  // ACTIVE | DAILY_PAUSED | BREACHED | SUSPENDED | CLOSED
+  tradingStatus     String   @default("PENDING")
+  statusReason      String?
+
+  startingBalanceMinor BigInt
+  /// Reconciled simulated balance. Authoritative for payouts.
+  balanceMinor         BigInt
+  equityMinor          BigInt
+  /// H — highest observed intraday equity.
+  highWaterMinor       BigInt
+  /// T — current trailing threshold.
+  thresholdMinor       BigInt
+
+  sessionDate            String?
+  sessionStartEquityMinor BigInt @default(0)
+  sessionWithdrawalsMinor BigInt @default(0)
+
+  /// Last time authoritative provider data was received.
+  lastSyncAt        DateTime?
+  /// True when data is too old to act on. Blocks payouts and new exposure.
+  dataStale         Boolean  @default(true)
+  /// Highest provider sequence id applied, for out-of-order rejection.
+  lastSequence      BigInt   @default(0)
+
+  breachedAt        DateTime?
+  breachReason      String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  providerEvents    ProviderEvent[]
+  equityCheckpoints EquityCheckpoint[]
+  positionSnapshots PositionSnapshot[]
+  riskEvents        RiskEvent[]
+  payoutRequests    PayoutRequest[]
+  reservations      PayoutReservation[]
+
+  @@index([userId])
+  @@index([tradingStatus])
+  @@index([dataStale])
+}
+
+/// Raw provider events, preserved alongside their normalised form so a
+/// disputed balance can be reconstructed from source.
+model ProviderEvent {
+  id               String   @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+  provider         String
+  eventType        String
+  /// Provider's own monotonic sequence, used to drop duplicates and reorder.
+  sequence         BigInt
+  /// Time the PROVIDER says it happened.
+  sourceTimestamp  DateTime
+  receivedAt       DateTime @default(now())
+  /// Untouched provider payload.
+  rawPayload       String
+  /// Our interpretation of it.
+  normalised       String
+  /// True when this event superseded an earlier corrected fill.
+  isCorrection     Boolean  @default(false)
+  applied          Boolean  @default(false)
+  ignoredReason    String?
+
+  /// The duplicate guard: the same provider event can arrive many times.
+  @@unique([provider, tradingAccountId, sequence])
+  @@index([tradingAccountId, sourceTimestamp])
+}
+
+model EquityCheckpoint {
+  id               String   @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+  sessionDate      String
+  equityMinor      BigInt
+  balanceMinor     BigInt
+  unrealisedMinor  BigInt
+  commissionsMinor BigInt
+  highWaterMinor   BigInt
+  thresholdMinor   BigInt
+  sequence         BigInt
+  observedAt       DateTime
+  createdAt        DateTime @default(now())
+
+  @@index([tradingAccountId, observedAt])
+  @@index([tradingAccountId, sessionDate])
+}
+
+model PositionSnapshot {
+  id               String   @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+  /// JSON array of { symbol, signedQuantity }.
+  positions        String
+  /// JSON array of { symbol, signedQuantity, intent, ocoGroupId }.
+  workingOrders    String
+  microEquivalents Int
+  capMicroEquivalents Int
+  observedAt       DateTime
+  createdAt        DateTime @default(now())
+
+  @@index([tradingAccountId, observedAt])
+}
+
+model RiskEvent {
+  id               String   @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+  // DAILY_LOSS_BREACH | TRAILING_BREACH | EXPOSURE_REJECTED | DATA_STALE |
+  // DATA_RECOVERED | FLATTEN_REQUESTED | FLATTEN_CONFIRMED | TRADING_DISABLED |
+  // TRADING_DISABLE_FAILED | SESSION_ROLLED
+  eventType        String
+  severity         String   @default("INFO") // INFO | WARNING | CRITICAL
+  /// Plain-language reason shown to BOTH the trader and the admin.
+  reason           String
+  /// Supporting evidence: equity, threshold, the events that led here.
+  evidence         String
+  sessionDate      String?
+  /// For actions requested at the provider: did it actually complete?
+  requestedAction  String?
+  actionConfirmed  Boolean?
+  actionDetail     String?
+  occurredAt       DateTime @default(now())
+
+  @@index([tradingAccountId, occurredAt])
+  @@index([eventType])
+}
+
+// ---------------------------------------------------------------------------
+// Payouts
+// ---------------------------------------------------------------------------
+
+model PayoutRequest {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+
+  /// State machine in src/domain/payout/state-machine.ts.
+  state            String   @default("requested")
+  grossMinor       BigInt
+  cashMinor        BigInt
+  /// Session the request is attributed to. Fixed at request time.
+  sessionDate      String
+
+  balanceBeforeMinor BigInt
+  balanceAfterMinor  BigInt
+  thresholdAtRequestMinor BigInt
+  /// Snapshot of the rules applied, so an old payout stays explainable.
+  policySnapshot   String
+  policyVersion    String
+
+  reviewReason     String?
+  reviewedBy       String?
+  reviewedAt       DateTime?
+  rejectionReason  String?
+
+  paymentProvider  String?
+  paymentRef       String?
+  /// Set when the provider outcome is genuinely unknown.
+  outcomeUnknown   Boolean  @default(false)
+  reconciliationNote String?
+
+  idempotencyKey   String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  paidAt           DateTime?
+
+  reservation      PayoutReservation?
+  transitions      PayoutTransition[]
+
+  @@index([userId, state])
+  @@index([state])
+  @@index([tradingAccountId, sessionDate])
+}
+
+model PayoutTransition {
+  id              String   @id @default(cuid())
+  payoutRequestId String
+  payoutRequest   PayoutRequest @relation(fields: [payoutRequestId], references: [id], onDelete: Cascade)
+  fromState       String
+  toState         String
+  reason          String
+  actor           String
+  createdAt       DateTime @default(now())
+
+  @@index([payoutRequestId, createdAt])
+}
+
+model PayoutReservation {
+  id               String   @id @default(cuid())
+  payoutRequestId  String   @unique
+  payoutRequest    PayoutRequest @relation(fields: [payoutRequestId], references: [id])
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+  sessionDate      String
+  cashAmountMinor  BigInt
+  // ACTIVE | CONSUMED | RELEASED
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tradingAccountId, sessionDate, status])
+  @@index([tradingAccountId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Ledgers
+// ---------------------------------------------------------------------------
+
+model LedgerEntry {
+  id             String   @id @default(cuid())
+  ledger         String // SIMULATION | CASH | OBLIGATION | REVENUE
+  reason         String
+  actor          String
+  policyVersion  String
+  /// UNIQUE: the guard against a retried job posting the same entry twice.
+  idempotencyKey String   @unique
+  references     String
+  compensatesEntryId String?
+  createdAt      DateTime @default(now())
+
+  lines          LedgerLine[]
+
+  @@index([ledger, createdAt])
+  @@index([compensatesEntryId])
+}
+
+model LedgerLine {
+  id            String      @id @default(cuid())
+  entryId       String
+  entry         LedgerEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account       String
+  debitMinor    BigInt      @default(0)
+  creditMinor   BigInt      @default(0)
+  /// Running balance after this line, for auditability.
+  balanceAfterMinor BigInt?
+
+  @@index([account])
+  @@index([entryId])
+}
+
+model ReconciliationRun {
+  id            String   @id @default(cuid())
+  kind          String // PROVIDER_BALANCES | PAYMENTS | PAYOUTS
+  // RUNNING | CLEAN | MISMATCH | FAILED
+  status        String   @default("RUNNING")
+  startedAt     DateTime @default(now())
+  finishedAt    DateTime?
+  checkedCount  Int      @default(0)
+  mismatchCount Int      @default(0)
+  /// Details of every mismatch found, for the admin console.
+  findings      String?
+
+  @@index([kind, startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Legal documents and signatures
+// ---------------------------------------------------------------------------
+
+model LegalDocumentVersion {
+  id          String   @id @default(cuid())
+  slug        String // trader-agreement | simulation-disclosure | ...
+  version     Int
+  title       String
+  /// Full text as presented. Kept so an old signature stays reproducible.
+  body        String
+  /// SHA-256 of body. Signed alongside the quote hash.
+  bodyHash    String
+  // DRAFT_PENDING_LEGAL_REVIEW | APPROVED | RETIRED
+  status      String   @default("DRAFT_PENDING_LEGAL_REVIEW")
+  /// True when this document must be signed before checkout completes.
+  requiredAtCheckout Boolean @default(true)
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  acceptances AgreementAcceptance[]
+
+  @@unique([slug, version])
+  @@index([slug, status])
+}
+
+model AgreementAcceptance {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  documentId    String
+  document      LegalDocumentVersion @relation(fields: [documentId], references: [id])
+  quoteId       String?
+  quote         Quote?   @relation(fields: [quoteId], references: [id])
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id])
+
+  /// Hash of the exact document text signed.
+  documentHash  String
+  /// Hash of the exact quote signed. A price change invalidates it.
+  quoteHash     String?
+  /// Typed legal name, the affirmative signature action.
+  typedLegalName String
+  /// The exact consent wording shown next to the signature control.
+  consentWording String
+  signatureMethod String @default("TYPED_NAME")
+  /// Limited security evidence, retained under the policy in docs/OPERATIONS.md.
+  ipAddress     String?
+  userAgent     String?
+  signedAt      DateTime @default(now())
+
+  @@unique([userId, documentId, quoteId])
+  @@index([userId])
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+/// Durable job queue. Survives restarts; workers claim rows atomically.
+model Job {
+  id             String   @id @default(cuid())
+  kind           String
+  payload        String
+  // PENDING | CLAIMED | SUCCEEDED | FAILED | DEAD
+  status         String   @default("PENDING")
+  attempts       Int      @default(0)
+  maxAttempts    Int      @default(5)
+  runAfter       DateTime @default(now())
+  claimedAt      DateTime?
+  claimedBy      String?
+  lastError      String?
+  /// UNIQUE: enqueueing the same logical job twice is a no-op.
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, runAfter])
+}
+
+/// Transactional outbox: written in the same transaction as the state change,
+/// dispatched afterwards. Prevents "state changed but the side effect was lost".
+model OutboxMessage {
+  id             String   @id @default(cuid())
+  topic          String
+  payload        String
+  // PENDING | SENT | FAILED
+  status         String   @default("PENDING")
+  attempts       Int      @default(0)
+  lastError      String?
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+  sentAt         DateTime?
+
+  @@index([status, createdAt])
+}
+
+/// Demo mode writes here instead of sending real email.
+model EmailOutbox {
+  id          String   @id @default(cuid())
+  toAddress   String
+  subject     String
+  bodyText    String
+  bodyHtml    String?
+  /// Attached signed documents and receipts, as JSON metadata.
+  attachments String?
+  // QUEUED | WRITTEN_LOCALLY | SENT | FAILED
+  status      String   @default("QUEUED")
+  provider    String   @default("local-outbox")
+  providerRef String?
+  error       String?
+  createdAt   DateTime @default(now())
+  sentAt      DateTime?
+
+  @@index([status, createdAt])
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id])
+  actorLabel  String
+  action      String
+  entityType  String
+  entityId    String
+  /// Required for money-moving and rule-changing actions.
+  reason      String?
+  before      String?
+  after       String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
+
+/// Second approver for high-impact money actions.
+model DualApproval {
+  id          String   @id @default(cuid())
+  action      String
+  entityType  String
+  entityId    String
+  requestedBy String
+  requestedAt DateTime @default(now())
+  reason      String
+  approvedBy  String?
+  approvedAt  DateTime?
+  // PENDING | APPROVED | REJECTED | EXPIRED
+  status      String   @default("PENDING")
+  rejectionReason String?
+
+  @@unique([action, entityId, status])
+  @@index([status])
+}
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  subject   String
+  body      String
+  // OPEN | PENDING | RESOLVED | CLOSED
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  kind      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+}
+
+/// Owner-controlled runtime switches, including the launch gate.
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+/// Instrument risk configuration. An instrument absent from this table cannot
+/// be traded: equal dollar risk is never assumed.
+model ProductRiskConfig {
+  symbol                     String   @id
+  nettingGroup               String
+  microEquivalentsPerContract Int
+  approved                   Boolean  @default(false)
+  description                String
+  approvedBy                 String?
+  approvedAt                 DateTime?
+  updatedAt                  DateTime @updatedAt
+
+  @@index([nettingGroup])
 }

@@ -67,7 +67,9 @@ export class Money {
     if (!match) {
       throw new MoneyError(`Cannot parse money from ${JSON.stringify(value)}`);
     }
-    const [, sign, whole, fraction = ''] = match;
+    const sign = match[1];
+    const whole = match[2] ?? '0';
+    const fraction = match[3] ?? '';
     const scale = Money.scaleOf(currency);
     if (fraction.length > scale) {
       throw new MoneyError(
