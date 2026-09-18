@@ -23,7 +23,7 @@ export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
   const isAdmin = user ? ADMIN_ROLES.includes(user.role) : false;
 
   return (
-    <header className="border-b border-border bg-bg sticky top-0 z-40">
+    <header className="border-b border-border bg-bg/85 backdrop-blur sticky top-0 z-40">
       <nav
         aria-label="Primary"
         className="mx-auto max-w-7xl px-4 h-20 flex items-center justify-between gap-4"

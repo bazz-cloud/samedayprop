@@ -81,57 +81,6 @@ h3,
 }
 
 /* ---------------------------------------------------------------------------
- * Logo
- *
- * The supplied artwork is a JPEG on a solid black field. `screen` blending
- * drops that black against our near-black ground, so the bull and the slashes
- * read as if they were cut out, without shipping a second masked asset.
- * ------------------------------------------------------------------------- */
-/*
- * Two elements, deliberately. `filter` establishes a stacking context, so
- * putting it on the same element as `mix-blend-mode` isolates that element and
- * the blend has nothing to composite against — which renders the mark as an
- * opaque black rectangle. The blend lives on the wrapper, the filter on the
- * child. The same trap applies to any ancestor, which is why the site header
- * uses an opaque background rather than a backdrop blur.
- */
-.logo-screen {
-  display: block;
-  mix-blend-mode: screen;
-}
-
-.logo-ink {
-  /* JPEG compression leaves the black field a few levels above zero, and screen
-     lifts anything non-zero. Contrast crushes those levels back to true black
-     without touching the green slashes. */
-  filter: contrast(1.32) brightness(1.03) saturate(1.05);
-}
-
-/*
- * Full lockup, cropped to its ink.
- *
- * background-size 113.6% and position 50.1%/49.3% frame the region
- * x 6-94%, y 34-65% of the square artwork — wider than the ink needs, so the H
- * of RUSH keeps its side bearing. The container must hold the resulting 2.84:1
- * aspect or the wordmark clips.
- */
-.brand-lockup {
-  background-image: url('/brand/bull-rush-futures.jpg');
-  background-repeat: no-repeat;
-  background-size: 113.6% auto;
-  background-position: 50.1% 49.3%;
-  aspect-ratio: 2.84 / 1;
-}
-
-/* Isolates the bull and its speed slashes from the full 1600x1600 lockup. */
-.bull-mark {
-  background-image: url('/brand/bull-rush-futures.jpg');
-  background-repeat: no-repeat;
-  background-size: 320% auto;
-  background-position: 14.5% 49%;
-}
-
-/* ---------------------------------------------------------------------------
  * Hero motion
  *
  * The bull charges in from the left, the burst fires, and the three claims

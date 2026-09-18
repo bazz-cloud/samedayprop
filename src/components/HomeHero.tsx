@@ -61,7 +61,7 @@ export function HomeHero() {
         <div className="grid items-center gap-8 lg:grid-cols-12">
           {/* ---- the bull ------------------------------------------------- */}
           <div className="lg:col-span-4 order-1">
-            <BullMark className="anim-bull mx-auto block h-44 w-52 sm:h-56 sm:w-64 lg:mx-0 lg:h-72 lg:w-80" />
+            <BullMark priority className="anim-bull mx-auto block h-40 w-auto sm:h-52 lg:mx-0 lg:h-72" />
           </div>
 
           {/* ---- the claims ----------------------------------------------- */}
