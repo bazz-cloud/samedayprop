@@ -5,6 +5,7 @@ import {
   RESET_DISCOUNT,
   checkResetEligibility,
   computeResetState,
+  referencePriceForReset,
   resetPrice,
   resetPriceForKey,
   type ResetEligibilityInput,
@@ -18,24 +19,32 @@ const healthy: ResetEligibilityInput = {
 };
 
 describe('reset pricing', () => {
-  it('is exactly $10 below the account list price', () => {
+  it('is exactly $10 below the DISCOUNTED account price', () => {
     expect(RESET_DISCOUNT.value.toDecimalString()).toBe('10.00');
     for (const plan of PLANS) {
-      const expected = plan.listPrice.value.minus(usd('10.00'));
+      const expected = referencePriceForReset(plan).minus(usd('10.00'));
       expect(resetPrice(plan).equals(expected)).toBe(true);
     }
   });
 
   it('matches the table for every account', () => {
-    expect(resetPriceForKey('SIM_25K').toDecimalString()).toBe('339.00');
-    expect(resetPriceForKey('SIM_50K').toDecimalString()).toBe('589.00');
-    expect(resetPriceForKey('SIM_100K').toDecimalString()).toBe('989.00');
-    expect(resetPriceForKey('SIM_150K').toDecimalString()).toBe('1489.00');
-    expect(resetPriceForKey('SIM_300K').toDecimalString()).toBe('2489.00');
+    expect(resetPriceForKey('SIM_25K').toDecimalString()).toBe('251.75');
+    expect(resetPriceForKey('SIM_50K').toDecimalString()).toBe('439.25');
+    expect(resetPriceForKey('SIM_100K').toDecimalString()).toBe('739.25');
+    expect(resetPriceForKey('SIM_150K').toDecimalString()).toBe('1114.25');
+    expect(resetPriceForKey('SIM_300K').toDecimalString()).toBe('1864.25');
+  });
+
+  it('always undercuts the cheapest way to buy the account outright', () => {
+    // The whole point: a reset a trader would never choose is not a product.
+    for (const plan of PLANS) {
+      expect(resetPrice(plan).lt(referencePriceForReset(plan))).toBe(true);
+      expect(resetPrice(plan).lt(plan.listPrice.value)).toBe(true);
+    }
   });
 
   it('refuses to price a reset at or below zero', () => {
-    const cheap = { ...getPlan('SIM_25K'), listPrice: { ...getPlan('SIM_25K').listPrice, value: usd('10.00') } };
+    const cheap = { ...getPlan('SIM_25K'), listPrice: { ...getPlan('SIM_25K').listPrice, value: usd('12.00') } };
     expect(() => resetPrice(cheap)).toThrow(/must cost something/);
   });
 });

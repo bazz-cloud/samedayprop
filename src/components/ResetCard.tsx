@@ -55,7 +55,7 @@ export function ResetCard({ offer }: { offer: ResetOfferView }) {
           <dd className="tnum text-accent font-semibold">{offer.price}</dd>
         </div>
         <div className="flex justify-between py-2 border-b border-border">
-          <dt className="text-fg-muted">A new {offer.planLabel} account</dt>
+          <dt className="text-fg-muted">A new {offer.planLabel} account, discounted</dt>
           <dd className="tnum text-fg-subtle line-through">{offer.newAccountPrice}</dd>
         </div>
         {offer.resetCount > 0 && (

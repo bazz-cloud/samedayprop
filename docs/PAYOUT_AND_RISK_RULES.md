@@ -297,11 +297,16 @@ policy version and its references.
 
 ## 6. Account resets
 
-A breached account can be restored for its plan's list price minus $10.
+A breached account can be restored for $10 less than the cheapest way to buy the
+same account again.
 
 ```
-reset price = list price − $10
+reset price = discounted account price − $10
 ```
+
+Priced against the DISCOUNTED price deliberately. Against list price the reset
+came out above the coupon price — a reset costing more than a new account, which
+nobody would buy. A test asserts the reset undercuts both.
 
 A reset restores the simulated balance, the high-water mark and the threshold to
 their opening values, clears the breach and any lockout, and returns the account

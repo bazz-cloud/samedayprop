@@ -33,6 +33,20 @@ export interface RuleLine {
   readonly status: string;
 }
 
+/**
+ * A single number a buyer scans, with no prose.
+ *
+ * The buy pages carry these; the full explanations live on /rules. Someone
+ * choosing an account size is comparing figures, and a paragraph beside each
+ * one buries the figure they came for.
+ */
+export interface KeyFact {
+  readonly label: string;
+  readonly value: string;
+  /** Shown as a caveat chip when the term is not commercially confirmed. */
+  readonly status: string;
+}
+
 export interface PlanView {
   readonly key: string;
   readonly label: string;
@@ -55,6 +69,7 @@ export interface PlanView {
   readonly firstWithdrawalGross: SerialisedMoney;
   readonly firstWithdrawalCash: SerialisedMoney;
   readonly firstWithdrawalLeaves: SerialisedMoney;
+  readonly keyFacts: readonly KeyFact[];
   readonly rules: readonly RuleLine[];
   readonly launchBlockers: readonly { field: string; status: string; detail: string }[];
   readonly sellable: boolean;
@@ -210,6 +225,36 @@ function buildPlanView(plan: PlanDefinition): PlanView {
     },
   ];
 
+  // The short form: six numbers, no sentences.
+  const keyFacts: KeyFact[] = [
+    {
+      label: 'Max position',
+      value: `${plan.positionCeiling.value.minis} minis / ${plan.positionCeiling.value.micros} micros`,
+      status: plan.positionCeiling.status,
+    },
+    {
+      label: 'Daily loss limit',
+      value: plan.dailyLossLimit.value.format(),
+      status: plan.dailyLossLimit.status,
+    },
+    {
+      label: 'Max drawdown',
+      value: `${plan.drawdownAllowance.value.format()} trailing`,
+      status: plan.drawdownAllowance.status,
+    },
+    {
+      label: 'Profit buffer',
+      value: plan.retainedBuffer.value.format(),
+      status: plan.retainedBuffer.status,
+    },
+    {
+      label: 'Daily payout cap',
+      value: plan.dailyCashPayoutCap.value.format(),
+      status: plan.dailyCashPayoutCap.status,
+    },
+    { label: 'Your split', value: '50% in cash', status: 'CONFIRMED' },
+  ];
+
   const blockers = planLaunchBlockers(plan);
 
   return {
@@ -239,6 +284,7 @@ function buildPlanView(plan: PlanDefinition): PlanView {
     firstWithdrawalGross: serialiseMoney(minimumGross),
     firstWithdrawalCash: serialiseMoney(minimumGross.halfExact()),
     firstWithdrawalLeaves: serialiseMoney(firstWithdrawalLeaves),
+    keyFacts,
     rules,
     launchBlockers: blockers,
     sellable: blockers.length === 0,

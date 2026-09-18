@@ -72,16 +72,12 @@ export function PlanComparisonTable({
                 <span className="block text-fg-subtle line-through tnum text-xs">
                   {plan.listPrice.display}
                 </span>
-                <span className="block text-xs text-fg-subtle mt-1">
-                  One-time &middot; no renewal
-                </span>
+                <span className="block text-xs text-fg-subtle mt-1">one-time</span>
               </td>
 
               <td className="px-3 py-4 border-b border-border align-top">
                 <span className="block tnum">{plan.drawdownAllowance.display}</span>
-                <span className="block text-xs text-fg-subtle mt-0.5">
-                  Intraday trailing, stops at {plan.trailingStopAt.display}
-                </span>
+                <span className="block text-xs text-fg-subtle mt-0.5">intraday trailing</span>
               </td>
 
               <td className="px-3 py-4 border-b border-border align-top tnum">
@@ -96,15 +92,15 @@ export function PlanComparisonTable({
               </td>
 
               <td className="px-3 py-4 border-b border-border align-top">
-                <span className="block">Same day eligible</span>
+                <span className="block">Same day</span>
                 <span className="block text-xs text-fg-subtle mt-0.5">
-                  incl. day one &middot; {plan.dailyCashCap.display}/day cap
+                  {plan.dailyCashCap.display}/day cap
                 </span>
               </td>
 
               <td className="px-3 py-4 border-b border-border align-top">
                 <span className="block font-semibold">50%</span>
-                <span className="block text-xs text-fg-subtle mt-0.5">of gross withdrawal</span>
+                <span className="block text-xs text-fg-subtle mt-0.5">in cash</span>
               </td>
 
               <td className="px-3 py-4 border-b border-border align-top text-right">
@@ -132,8 +128,11 @@ export function PlanComparisonTable({
             <Badge tone="accent">No minimum trading days</Badge>
           </span>
           <span>
-            Discounted prices apply with code{' '}
-            <span className="font-mono text-fg-muted">{plans[0]?.couponCode}</span>.
+            Prices shown with code{' '}
+            <span className="font-mono text-fg-muted">{plans[0]?.couponCode}</span>.{' '}
+            <Link href="/rules" className="text-accent hover:underline">
+              Full rules
+            </Link>
           </span>
         </div>
       )}

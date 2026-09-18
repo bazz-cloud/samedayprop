@@ -167,6 +167,24 @@ export default function RulesPage() {
         </p>
       </section>
 
+      <section aria-labelledby="resets" className="space-y-4">
+        <h2 id="resets" className="text-2xl font-bold tracking-tight">Resets</h2>
+        <p className="text-fg-muted leading-relaxed">
+          If your account breaches its maximum drawdown you can reset it back to its starting
+          balance for <strong className="text-fg">$10 less</strong> than buying the same account
+          again at the discounted price. You keep your platform sign-in and your payout history.
+        </p>
+        <Callout tone="warn" title="What a reset does not give back">
+          Any lifetime payout capacity you have already used stays used. A reset restores your
+          balance, not your remaining payout headroom.
+        </Callout>
+        <p className="text-sm text-fg-subtle leading-relaxed">
+          A reset is not available while a payout request is in progress, since it would change the
+          balance that request was checked against. A daily loss lockout does not need a reset &mdash;
+          it lifts by itself at the next market open.
+        </p>
+      </section>
+
       <section aria-labelledby="by-account" className="space-y-4">
         <h2 id="by-account" className="text-2xl font-bold tracking-tight">Limits by account size</h2>
         <div className="overflow-x-auto -mx-4 px-4">

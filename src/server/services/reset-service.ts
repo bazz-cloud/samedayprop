@@ -17,7 +17,12 @@
 import { prisma } from '@/server/db';
 import { Money } from '@/domain/money/money';
 import { getPlan, TRAILING_STOP_OFFSET, type PlanKey } from '@/domain/catalog/plans';
-import { checkResetEligibility, computeResetState, resetPriceForKey } from '@/domain/catalog/resets';
+import {
+  checkResetEligibility,
+  computeResetState,
+  referencePriceForReset,
+  resetPriceForKey,
+} from '@/domain/catalog/resets';
 import { buildSimulatedAdjustmentEntry } from '@/domain/ledger/entries';
 import { postEntry } from './ledger-service';
 import { recordAudit } from './audit-service';
@@ -83,8 +88,8 @@ export async function getResetOffer(
     planKey,
     planLabel: plan.label,
     price: resetPriceForKey(planKey),
-    newAccountPrice: plan.listPrice.value,
-    saving: plan.listPrice.value.minus(resetPriceForKey(planKey)),
+    newAccountPrice: referencePriceForReset(plan),
+    saving: referencePriceForReset(plan).minus(resetPriceForKey(planKey)),
     allowed: eligibility.allowed,
     reason: eligibility.message,
     resetCount: account.resetCount,

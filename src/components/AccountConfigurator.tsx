@@ -46,13 +46,6 @@ interface Preview {
   productionBlockers: { code: string; detail: string }[];
 }
 
-function statusTone(status: string): 'accent' | 'warn' | 'danger' | 'info' {
-  if (status === 'CONFIRMED') return 'accent';
-  if (status === 'PROPOSED') return 'warn';
-  if (status === 'EXTERNAL') return 'info';
-  return 'danger';
-}
-
 function statusLabel(status: string): string {
   switch (status) {
     case 'CONFIRMED':
@@ -141,7 +134,7 @@ export function AccountConfigurator({
             <SectionHeading
               number={1}
               title="Choose your account size"
-              hint="A one-time purchase. Larger accounts carry larger limits and larger payout caps."
+              hint="One-time purchase. Larger accounts, larger limits."
             />
             <h3 id="size-heading" className="sr-only">
               Account size
@@ -195,9 +188,9 @@ export function AccountConfigurator({
               </div>
             </fieldset>
             <p className="text-xs text-fg-subtle mt-3">
-              Discounted prices shown apply with code{' '}
-              <span className="font-mono text-fg-muted">{plan.couponCode}</span>. Apply it in step 4
-              to see it in your total.
+              Prices shown with code{' '}
+              <span className="font-mono text-fg-muted">{plan.couponCode}</span> &mdash; apply it in
+              step 4.
             </p>
           </section>
 
@@ -205,7 +198,7 @@ export function AccountConfigurator({
             <SectionHeading
               number={2}
               title="Trading platform"
-              hint="Tradovate is the only platform offered."
+              
             />
             <h3 id="platform-heading" className="sr-only">
               Platform
@@ -215,16 +208,11 @@ export function AccountConfigurator({
                 <div>
                   <p className="font-medium">Tradovate</p>
                   <p className="text-sm text-fg-muted mt-1">
-                    Included with every account. No alternative platform is offered, so there is
-                    nothing to choose here.
+                    Included. No other platform is offered.
                   </p>
                 </div>
-                <Badge tone="info">Depends on a third party</Badge>
+                <Badge tone="info">Not yet verified</Badge>
               </div>
-              <p className="text-xs text-fg-subtle mt-3">
-                Platform access depends on partner capabilities that have not yet been verified.
-                Until they are, accounts are provisioned in a clearly labelled simulation only.
-              </p>
             </div>
           </section>
 
@@ -232,7 +220,7 @@ export function AccountConfigurator({
             <SectionHeading
               number={3}
               title="Optional extras"
-              hint="Nothing here is required. None of these affect your rules, your limits or your payouts."
+              hint="Optional. None of these affect your rules or payouts."
             />
             <h3 id="extras-heading" className="sr-only">
               Optional extras
@@ -268,11 +256,10 @@ export function AccountConfigurator({
                           </span>
                         </span>
                       </div>
-                      <p className="text-sm text-fg-muted mt-1">{addon.description}</p>
-                      <p className="text-xs text-fg-subtle mt-1">{addon.delivery}</p>
+                      <p className="text-sm text-fg-muted mt-1">{addon.delivery}</p>
                       {addon.status !== 'CONFIRMED' && (
                         <span className="inline-block mt-2">
-                          <Badge tone="warn">Candidate product — price not final</Badge>
+                          <Badge tone="warn">Price not final</Badge>
                         </span>
                       )}
                     </div>
@@ -281,14 +268,13 @@ export function AccountConfigurator({
               })}
             </fieldset>
             <Callout tone="neutral">
-              Account statistics, the rules that apply to you, payout eligibility, requesting and
-              receiving a payout, basic exports, account security and ordinary support are
-              included with every account and can never be moved behind a paid extra.
+              Stats, rules, payouts, exports, security and support are always included. No extra
+              changes your rules or your payouts.
             </Callout>
           </section>
 
           <section aria-labelledby="coupon-heading">
-            <SectionHeading number={4} title="Discount code" hint="One code per order. Codes do not stack." />
+            <SectionHeading number={4} title="Discount code" hint="One code per order." />
             <h3 id="coupon-heading" className="sr-only">
               Discount code
             </h3>
@@ -415,9 +401,8 @@ export function AccountConfigurator({
               </div>
 
               <p className="text-xs text-fg-subtle mt-3">
-                One-time charge. Not a subscription, and nothing renews automatically.
-                {preview?.taxStatus === 'NOT_CONFIGURED' &&
-                  ' Tax treatment has not been configured, so displayed amounts exclude any tax that may apply.'}
+                One-time charge. Nothing renews.
+                {preview?.taxStatus === 'NOT_CONFIGURED' && ' Tax not configured; totals exclude any tax.'}
               </p>
 
               <a
@@ -435,58 +420,74 @@ export function AccountConfigurator({
               )}
             </section>
 
-            {/* Rules sit beside the summary, exactly as the reference layout does. */}
+            {/* Six figures and the first-withdrawal example. The explanations
+                live on /rules — someone comparing account sizes is scanning
+                numbers, and a paragraph beside each one buries them. */}
             <section
               aria-labelledby="rules-heading"
               className="rounded-xl border border-border bg-surface p-5"
             >
-              <h2 id="rules-heading" className="text-lg font-semibold tracking-tight">
-                Your {plan.label} account rules
-              </h2>
-              <p className="text-sm text-fg-muted mt-1">
-                Simulated account size {plan.startingBalance.display}. This is a nominal figure, not
-                cash held for you.
-              </p>
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 id="rules-heading" className="text-lg font-semibold tracking-tight">
+                  {plan.label} at a glance
+                </h2>
+                <a href="/rules" className="text-sm text-accent hover:underline shrink-0">
+                  Full rules
+                </a>
+              </div>
 
               <div className="mt-4 rounded-lg border border-accent/30 bg-accent-dim/20 p-3">
-                <p className="text-sm font-medium text-accent">Your first withdrawal</p>
+                <p className="text-sm font-medium text-accent">First payout</p>
                 <p className="text-sm text-fg-muted mt-1 leading-relaxed">
-                  At a simulated balance of{' '}
-                  <span className="text-fg tnum">{plan.firstWithdrawalAt.display}</span> you can
-                  request <span className="text-fg tnum">{plan.firstWithdrawalGross.display}</span>{' '}
-                  gross, which pays{' '}
-                  <span className="text-fg tnum">{plan.firstWithdrawalCash.display}</span> in real
-                  cash and leaves{' '}
-                  <span className="text-fg tnum">{plan.firstWithdrawalLeaves.display}</span> in the
-                  simulated account.
+                  At <span className="text-fg tnum">{plan.firstWithdrawalAt.display}</span> you can
+                  take <span className="text-fg tnum">{plan.firstWithdrawalGross.display}</span>{' '}
+                  gross &rarr;{' '}
+                  <span className="text-accent tnum font-semibold">
+                    {plan.firstWithdrawalCash.display}
+                  </span>{' '}
+                  cash.
                 </p>
               </div>
 
               <dl className="mt-4">
-                {plan.rules.map((rule) => (
-                  <div key={rule.label} className="py-3 border-b border-border last:border-0">
-                    <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                      <dt className="text-sm text-fg-muted">{rule.label}</dt>
-                      <dd className="text-sm font-medium tnum text-right">{rule.value}</dd>
-                    </div>
-                    <p className="text-xs text-fg-subtle mt-1 leading-relaxed">{rule.detail}</p>
-                    {rule.status !== 'CONFIRMED' && (
-                      <span className="inline-block mt-2">
-                        <Badge tone={statusTone(rule.status)}>{statusLabel(rule.status)}</Badge>
-                      </span>
-                    )}
+                {plan.keyFacts.map((fact) => (
+                  <div
+                    key={fact.label}
+                    className="flex items-baseline justify-between gap-3 py-2.5 border-b border-border last:border-0"
+                  >
+                    <dt className="text-sm text-fg-muted">{fact.label}</dt>
+                    <dd className="text-sm font-medium tnum text-right">
+                      {fact.value}
+                      {fact.status !== 'CONFIRMED' && (
+                        <span className="block text-[11px] font-normal text-warn mt-0.5">
+                          {statusLabel(fact.status)}
+                        </span>
+                      )}
+                    </dd>
                   </div>
                 ))}
               </dl>
+
+              <p className="mt-4 text-xs text-fg-subtle leading-relaxed">
+                No evaluation, no consistency rule, no minimum trading days. Simulated account;
+                the balance is a nominal figure, not cash held for you.
+              </p>
             </section>
 
             {preview && preview.productionBlockers.length > 0 && (
-              <Callout tone="warn" title="Why this is demonstration only">
-                <ul className="list-disc pl-5 space-y-1 mt-1">
-                  {preview.productionBlockers.map((blocker) => (
-                    <li key={blocker.code}>{blocker.detail}</li>
-                  ))}
-                </ul>
+              <Callout tone="warn" title="Demonstration only">
+                <p>
+                  {preview.productionBlockers.length} commercial terms are still awaiting owner
+                  approval, so this account cannot be sold for real money yet.
+                </p>
+                <details className="mt-2">
+                  <summary className="cursor-pointer underline">Which ones</summary>
+                  <ul className="list-disc pl-5 space-y-1 mt-2">
+                    {preview.productionBlockers.map((blocker) => (
+                      <li key={blocker.code}>{blocker.detail}</li>
+                    ))}
+                  </ul>
+                </details>
               </Callout>
             )}
           </div>

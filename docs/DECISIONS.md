@@ -89,7 +89,7 @@ Other proposed defaults:
 | Mini/micro conversion | 10 micro-equivalents per mini | Per-product controls required; equal dollar risk is never assumed. |
 | Coupon code | `START25` | Name, validity window and use limits all configurable. |
 | Daily-loss lockout expiry | Globex reopen, 18:00 ET | An hour after the 17:00 session roll that refreshes the allowance. Weekend behaviour needs the approved exchange calendar. |
-| Account reset price | List price &minus; $10 | Confirmed by the owner. |
+| Account reset price | Discounted price &minus; $10 | Confirmed by the owner. Priced against the coupon price, not list: against list it exceeded the coupon price, so a reset cost more than a new account. |
 | Reset restores | Starting balance, high-water and threshold | Consumed lifetime payout capacity and payout history are NOT restored. |
 | Gross withdrawal increment | $1.00 | Derived control: keeps the 50/50 split free of fractional cents. |
 | Post-withdrawal room | $0.01 above the trailing threshold | Derived control: a payout must not be what trips a breach. |

@@ -1114,12 +1114,16 @@ describe('a paid reset', () => {
     expect(offer?.reason).toMatch(/still active/);
   });
 
-  it('prices the reset $10 below the account', async () => {
+  it('prices the reset $10 below the DISCOUNTED account price', async () => {
     const { userId, accountId } = await provisionAccount();
     const { getResetOffer } = await import('@/server/services/reset-service');
     const offer = await getResetOffer(userId, accountId);
-    expect(offer?.price.toDecimalString()).toBe('589.00');
+    // $50K is $449.25 with the coupon, so a reset is $439.25 — cheaper than
+    // any way of buying the account again.
+    expect(offer?.price.toDecimalString()).toBe('439.25');
+    expect(offer?.newAccountPrice.toDecimalString()).toBe('449.25');
     expect(offer?.saving.toDecimalString()).toBe('10.00');
+    expect(offer!.price.lt(offer!.newAccountPrice)).toBe(true);
   });
 });
 

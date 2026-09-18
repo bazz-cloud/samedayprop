@@ -17,12 +17,19 @@
 
 import { Money, usd } from '../money/money';
 import { confirmed, proposed, type Governed } from '../config/requirement-status';
-import { getPlan, type PlanDefinition, type PlanKey } from './plans';
+import { couponPrice, getPlan, type PlanDefinition, type PlanKey } from './plans';
+import { DEFAULT_COUPON } from '../pricing/coupon';
 
-/** A reset costs this much less than buying the account outright. */
+/**
+ * A reset costs this much less than the cheapest way to buy the account.
+ *
+ * Priced against the DISCOUNTED price, not the list price. Against list it
+ * would have come out above the coupon price — a reset costing more than a new
+ * account, which nobody would ever buy.
+ */
 export const RESET_DISCOUNT: Governed<Money> = confirmed(
   usd('10.00'),
-  'A reset is priced $10 below the account list price.',
+  'A reset is priced $10 below the discounted account price.',
   'Owner decision',
 );
 
@@ -37,9 +44,17 @@ export const RESET_RESTORES_TO_STARTING_BALANCE: Governed<boolean> = proposed(
   'Derived default — see docs/DECISIONS.md',
 );
 
+/**
+ * The price a reset undercuts: the discounted account price, since that is what
+ * a trader would actually pay to start again.
+ */
+export function referencePriceForReset(plan: PlanDefinition): Money {
+  return couponPrice(plan.listPrice.value, DEFAULT_COUPON.value.percentOff);
+}
+
 /** Price of resetting an account on the given plan. */
 export function resetPrice(plan: PlanDefinition): Money {
-  const price = plan.listPrice.value.minus(RESET_DISCOUNT.value);
+  const price = referencePriceForReset(plan).minus(RESET_DISCOUNT.value);
   if (!price.isPositive()) {
     throw new Error(
       `Reset price for ${plan.key} would be ${price.toDecimalString()}. A reset must cost ` +
