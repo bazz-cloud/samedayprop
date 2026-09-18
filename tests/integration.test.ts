@@ -1012,6 +1012,53 @@ describe('coupon usage under concurrency', () => {
   });
 });
 
+describe('withdrawing a plan from sale', () => {
+  it('RETIRES its published version rather than deleting it', async () => {
+    // Stand in for a plan that was published and has since been withdrawn from
+    // the code catalog — the $75,000 account is the real case.
+    const withdrawn = await prisma.planVersion.create({
+      data: {
+        planKey: 'SIM_WITHDRAWN_TEST',
+        version: 1,
+        status: 'PUBLISHED',
+        label: '$75,000',
+        startingBalanceMinor: usd('75000.00').minor,
+        listPriceMinor: usd('799.00').minor,
+        ceilingMinis: 5,
+        ceilingMicros: 50,
+        drawdownAllowanceMinor: usd('2500.00').minor,
+        dailyLossLimitMinor: usd('900.00').minor,
+        retainedBufferMinor: usd('2500.00').minor,
+        dailyCashCapMinor: usd('2000.00').minor,
+        trailingStopOffsetMinor: usd('100.00').minor,
+        requirementStatuses: '{}',
+        launchBlockers: '[]',
+        sellableInProduction: true,
+        publishedAt: new Date(),
+      },
+    });
+
+    const { retireWithdrawnPlans } = await import('@/server/services/catalog-service');
+    const retired = await retireWithdrawnPlans();
+    expect(retired).toBeGreaterThanOrEqual(1);
+
+    // The row must still exist, with its terms byte-for-byte intact, so an
+    // order pointing at it still resolves to what was actually sold.
+    const after = await prisma.planVersion.findUnique({ where: { id: withdrawn.id } });
+    expect(after).not.toBeNull();
+    expect(after!.status).toBe('RETIRED');
+    expect(after!.sellableInProduction).toBe(false);
+    expect(after!.listPriceMinor).toBe(usd('799.00').minor);
+    expect(after!.retainedBufferMinor).toBe(usd('2500.00').minor);
+  });
+
+  it('leaves the plans still in the catalog published', async () => {
+    const live = await prisma.planVersion.findMany({ where: { status: 'PUBLISHED' } });
+    expect(live.length).toBeGreaterThan(0);
+    expect(live.map((p) => p.planKey)).not.toContain('SIM_75K');
+  });
+});
+
 describe('ledger integrity across the whole suite', () => {
   it('every ledger balances to zero', async () => {
     const results = await verifyLedgersBalance();

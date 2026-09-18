@@ -336,8 +336,7 @@ describe('plan risk parameters carry their approval status', () => {
   it('keeps the confirmed position ceilings confirmed', () => {
     expect(getPlan('SIM_25K').positionCeiling.status).toBe('CONFIRMED');
     expect(getPlan('SIM_150K').positionCeiling.status).toBe('CONFIRMED');
-    // The two the owner explicitly did not finalise stay unresolved.
-    expect(getPlan('SIM_75K').positionCeiling.status).toBe('UNRESOLVED');
+    // The one the owner explicitly did not finalise stays unresolved.
     expect(getPlan('SIM_300K').positionCeiling.status).toBe('UNRESOLVED');
   });
 });

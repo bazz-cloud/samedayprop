@@ -15,7 +15,7 @@ the system — not in the domain, not in the database (`BigInt` columns), not in
 the API (serialised as strings), not in the browser.
 
 Percentages are exact rationals: a 25% discount is `mulRatio(25n, 100n)`, never
-`* 0.25`. This is why all six published coupon prices come out exact.
+`* 0.25`. This is why all five published coupon prices come out exact.
 
 Rounding is explicit at every site. `half-up` for customer-facing pricing,
 `floor` when capping a payout (never round a limit up in the customer's favour

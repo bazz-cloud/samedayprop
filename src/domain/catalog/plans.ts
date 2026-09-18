@@ -22,7 +22,7 @@ import {
   lifetimeCapBlocksProductionSale,
 } from '../config/requirement-status';
 
-export type PlanKey = 'SIM_25K' | 'SIM_50K' | 'SIM_75K' | 'SIM_100K' | 'SIM_150K' | 'SIM_300K';
+export type PlanKey = 'SIM_25K' | 'SIM_50K' | 'SIM_100K' | 'SIM_150K' | 'SIM_300K';
 
 export interface PositionCeiling {
   /** Maximum simultaneous mini contracts. */
@@ -138,23 +138,6 @@ export const PLANS: readonly PlanDefinition[] = [
     retainedBuffer: proposed(usd('2000.00'), undefined, PROPOSED_RISK),
     dailyCashPayoutCap: proposed(usd('1500.00'), undefined, PROPOSED_RISK),
     lifetimeCashCap: draftLifetimeCap('3000.00'),
-  },
-  {
-    key: 'SIM_75K',
-    label: '$75,000',
-    startingBalance: usd('75000.00'),
-    listPrice: confirmed(usd('799.00'), 'One-time purchase, not a subscription.', CONFIRMED_PRICE),
-    positionCeiling: unresolved(
-      { minis: 5, micros: 50 },
-      'Position ceiling for the $75,000 account was explicitly NOT finalized. ' +
-        'The 5/50 figure is an interpolation for development only.',
-      'Build prompt §2 — "Not finalized"',
-    ),
-    drawdownAllowance: proposed(usd('2500.00'), undefined, PROPOSED_RISK),
-    dailyLossLimit: proposed(usd('900.00'), undefined, PROPOSED_RISK),
-    retainedBuffer: proposed(usd('2500.00'), undefined, PROPOSED_RISK),
-    dailyCashPayoutCap: proposed(usd('2000.00'), undefined, PROPOSED_RISK),
-    lifetimeCashCap: draftLifetimeCap('4000.00'),
   },
   {
     key: 'SIM_100K',

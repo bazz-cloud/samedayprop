@@ -37,7 +37,7 @@ These came directly from the brief and are treated as commitments.
 | Starting daily cash cap | $1,000 ($2,000 gross) on the $25K account. |
 | Billing | One-time purchase. Not a subscription, no automatic renewal. |
 | Coupon | 25% off the account and all selected eligible add-ons. |
-| Account sizes and list prices | Six sizes at $349 / $599 / $799 / $999 / $1,499 / $2,499. |
+| Account sizes and list prices | Five sizes at $349 / $599 / $999 / $1,499 / $2,499. |
 | Position ceilings | $25K: 2 minis / 20 micros. $50K: 4 / 40. $100K: 6 / 60. $150K: 10 / 100. |
 | Platform | Tradovate is the planned platform (capability verification is EXTERNAL). |
 | Checkout | Signed trader agreements required before payment and activation. |
@@ -48,7 +48,6 @@ These came directly from the brief and are treated as commitments.
 |---|---:|---:|
 | $25,000 | $349.00 | $261.75 |
 | $50,000 | $599.00 | $449.25 |
-| $75,000 | $799.00 | $599.25 |
 | $100,000 | $999.00 | $749.25 |
 | $150,000 | $1,499.00 | $1,124.25 |
 | $300,000 | $2,499.00 | $1,874.25 |
@@ -62,11 +61,14 @@ Asserted exactly in `tests/pricing.test.ts`.
 **Every plan is currently blocked from production sale** because each carries at
 least one PROPOSED risk parameter.
 
+The $75,000 account was withdrawn by the owner. Its published plan version is
+RETIRED rather than deleted, so any order that pointed at it still resolves to
+the exact terms that were sold.
+
 | Account | Drawdown allowance | Daily loss limit | Retained buffer | Daily cash cap |
 |---|---:|---:|---:|---:|
 | $25K | $1,000 | $400 | $1,000 | $1,000 *(confirmed)* |
 | $50K | $2,000 | $700 | $2,000 | $1,500 |
-| $75K | $2,500 | $900 | $2,500 | $2,000 |
 | $100K | $3,000 | $1,000 | $3,000 | $2,500 |
 | $150K | $4,500 | $1,500 | $4,500 | $3,000 |
 | $300K | $7,500 | $2,500 | $7,500 | $4,000 |
@@ -94,8 +96,9 @@ Other proposed defaults:
 
 ### Lifetime cash payout caps — the largest open exposure
 
-Recommended but **explicitly NOT approved**: $1,500 / $3,000 / $4,000 / $5,000 /
-$6,000 / $10,000 for the six sizes.
+Recommended but **explicitly NOT approved**: $1,500 / $3,000 / $5,000 / $6,000 /
+$10,000 for the five remaining sizes. (The $4,000 draft belonged to the $75,000
+account, which the owner has since withdrawn.)
 
 These are seeded as `kind: 'unresolved'` drafts. The type system makes it
 impossible to read a usable number out of an unresolved cap:
@@ -107,11 +110,10 @@ uncapped.
 **The owner must either approve an amount per plan, or explicitly approve an
 uncapped policy with a written acknowledgement that the obligation is unbounded.**
 
-### Position ceilings not finalised
+### Position ceiling not finalised
 
 | Account | Interpolated for development | Status |
 |---|---|---|
-| $75,000 | 5 minis / 50 micros | NOT finalised |
 | $300,000 | 15 minis / 150 micros | NOT finalised |
 
 ### Policies with no default

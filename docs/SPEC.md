@@ -62,7 +62,7 @@ crash between "state changed" and "side effect dispatched" loses nothing.
 
 ## 3. Catalog
 
-Six account sizes, one-time purchase, not subscriptions. Confirmed list prices
+Five account sizes, one-time purchase, not subscriptions. Confirmed list prices
 and confirmed coupon prices are in `DECISIONS.md` and asserted exactly in tests.
 
 Risk parameters per plan (drawdown allowance, daily loss limit, retained buffer,

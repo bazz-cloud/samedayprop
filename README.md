@@ -98,7 +98,7 @@ has to be something the owner affirmatively chose.
 Integer minor units on `bigint`, everywhere: domain, database (`BigInt`
 columns), API (strings), browser. Binary floating point never touches a balance.
 Percentages are exact rationals (`mulRatio(25n, 100n)`, never `* 0.25`), which
-is why all six published coupon prices come out exact and why
+is why all five published coupon prices come out exact and why
 `$599 + $19 + $29 + $49` with the coupon is exactly `$522.00`.
 
 `Money.halfExact()` throws rather than rounding, so the 50/50 split can never
@@ -172,8 +172,8 @@ password reset (needs email) · approved legal documents · tax configuration.
 ### Decisions still needed from the owner
 
 1. **Lifetime cash payout cap per plan** — the largest open financial exposure.
-2. Approval of every proposed risk parameter across all six plans.
-3. The $75,000 and $300,000 position ceilings.
+2. Approval of every proposed risk parameter across all five plans.
+3. The $300,000 position ceiling.
 4. Refunds, geographic eligibility, prohibited conduct, tax treatment.
 5. Company legal identity and contact details.
 

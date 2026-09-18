@@ -14,13 +14,13 @@ display.
 
 - [ ] **Lifetime cash payout cap per plan.** Approve an amount, or explicitly
       approve an uncapped policy with a written acknowledgement that the
-      obligation is unbounded. The recommended $1,500/$3,000/$4,000/$5,000/
-      $6,000/$10,000 figures were **not** approved. *This is the single largest
+      obligation is unbounded. The recommended $1,500/$3,000/$5,000/$6,000/
+      $10,000 figures were **not** approved. *This is the single largest
       open financial exposure.*
 - [ ] Approve or revise every PROPOSED risk parameter: drawdown allowance, daily
-      loss limit, retained buffer, daily cash cap, for all six plans.
+      loss limit, retained buffer, daily cash cap, for all five plans.
 - [ ] Approve the trailing stop policy (starting balance + $100).
-- [ ] Finalise the $75,000 and $300,000 position ceilings.
+- [ ] Finalise the $300,000 position ceiling.
 - [ ] Approve or revise the breach consequences.
 - [ ] Decide: one active account per person, or more.
 - [ ] Approve session times and the exchange/instrument holiday calendar.
@@ -137,7 +137,7 @@ display.
 | Legal documents | Seven drafts, none reviewed. |
 | Tax | Not configured. Totals exclude any tax. |
 | Commercial terms | Every plan has at least one unapproved parameter. |
-| Lifetime payout caps | Undecided on all six plans. |
+| Lifetime payout caps | Undecided on all five plans. |
 
 Nothing above should be described as launch-ready, and the application will not
 let it be sold as such.

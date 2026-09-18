@@ -47,7 +47,6 @@ describe('all six 25% coupon prices match the confirmed table exactly', () => {
   const expected: Record<string, [string, string]> = {
     SIM_25K: ['349.00', '261.75'],
     SIM_50K: ['599.00', '449.25'],
-    SIM_75K: ['799.00', '599.25'],
     SIM_100K: ['999.00', '749.25'],
     SIM_150K: ['1499.00', '1124.25'],
     SIM_300K: ['2499.00', '1874.25'],

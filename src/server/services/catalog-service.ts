@@ -66,10 +66,29 @@ function lifetimeCapColumns(plan: PlanDefinition) {
   }
 }
 
+/**
+ * Retire published plan versions whose plan is no longer in the code catalog.
+ *
+ * Withdrawing a plan from sale must not delete its version: an order already
+ * pointing at it has to keep resolving to the exact terms that were sold. The
+ * row is marked RETIRED instead, which removes it from the sale path while
+ * leaving every historical contract intact.
+ */
+export async function retireWithdrawnPlans(): Promise<number> {
+  const live = PLANS.map((p) => p.key);
+  const result = await prisma.planVersion.updateMany({
+    where: { status: 'PUBLISHED', planKey: { notIn: live } },
+    data: { status: 'RETIRED', sellableInProduction: false },
+  });
+  return result.count;
+}
+
 /** Publish the current code catalog as version 1 if nothing is published yet. */
 export async function publishCatalogIfEmpty(): Promise<{ plans: number; addons: number }> {
   let plans = 0;
   let addons = 0;
+
+  await retireWithdrawnPlans();
 
   for (const plan of PLANS) {
     const existing = await prisma.planVersion.findFirst({
