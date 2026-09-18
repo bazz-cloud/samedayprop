@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getPlanViews } from '@/server/views/catalog-view';
-import { Card } from '@/components/ui';
+import { Badge, Card } from '@/components/ui';
+import { PlanComparisonTable } from '@/components/PlanComparisonTable';
 
 /**
  * Home.
@@ -49,6 +50,61 @@ export default function HomePage() {
             Read the rules first
           </Link>
         </div>
+      </section>
+
+      <section aria-labelledby="plans" className="pb-16">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 mb-6">
+          <h2 id="plans" className="text-2xl font-bold tracking-tight">
+            Accounts at a glance
+          </h2>
+          <Link href="/accounts" className="text-sm text-accent hover:underline">
+            Configure an account &rarr;
+          </Link>
+        </div>
+        <PlanComparisonTable plans={plans} />
+      </section>
+
+      <section aria-labelledby="differences" className="pb-16">
+        <h2 id="differences" className="text-2xl font-bold tracking-tight mb-2">
+          What this program does not have
+        </h2>
+        <p className="text-fg-muted mb-6 max-w-2xl">
+          Four things that are standard elsewhere in this category and absent here.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              title: 'No evaluation',
+              body: 'No challenge to pass and no profit target to hit before you can trade a funded simulated account.',
+            },
+            {
+              title: 'No consistency rule',
+              body: 'No best-day concentration test. One large winning day does not reduce or disqualify a payout.',
+            },
+            {
+              title: 'No minimum days',
+              body: 'No minimum trading days and no minimum winning days. Day one can be eligible.',
+            },
+            {
+              title: 'No subscription',
+              body: 'One-time purchase. Nothing renews, and there is no activation fee on top.',
+            },
+          ].map((item) => (
+            <Card key={item.title} className="p-5">
+              <Badge tone="accent">Not required</Badge>
+              <h3 className="mt-3 font-semibold">{item.title}</h3>
+              <p className="mt-2 text-sm text-fg-muted leading-relaxed">{item.body}</p>
+            </Card>
+          ))}
+        </div>
+        <p className="mt-5 text-sm text-fg-subtle max-w-2xl leading-relaxed">
+          In exchange, the profit share is 50% rather than the 80&ndash;90% advertised elsewhere.
+          That is the trade, and it is stated on every page rather than in a footnote.{' '}
+          <Link href="/about" className="text-accent hover:underline">
+            More on how this differs
+          </Link>
+          .
+        </p>
       </section>
 
       <section aria-labelledby="what-you-get" className="pb-16">

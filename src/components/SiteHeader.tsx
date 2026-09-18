@@ -2,11 +2,20 @@ import Link from 'next/link';
 import type { AuthenticatedUser } from '@/server/auth/session';
 import { ADMIN_ROLES } from '@/server/auth/session';
 
+/**
+ * Primary navigation.
+ *
+ * Ordered the way this category orders it, because traders arrive already
+ * knowing where to look: the accounts first, then how the rules work, then
+ * payouts — which is the question most of them actually came with — then the
+ * platform, then everything else.
+ */
 const NAV = [
   { href: '/accounts', label: 'Accounts' },
-  { href: '/rules', label: 'How it works' },
+  { href: '/rules', label: 'Rules' },
+  { href: '/payouts', label: 'Payouts' },
+  { href: '/platform', label: 'Platform' },
   { href: '/faq', label: 'FAQ' },
-  { href: '/contact', label: 'Support' },
 ];
 
 export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
@@ -31,7 +40,7 @@ export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
           </span>
         </Link>
 
-        <ul className="hidden md:flex items-center gap-1 text-sm">
+        <ul className="hidden lg:flex items-center gap-0.5 text-sm">
           {NAV.map((item) => (
             <li key={item.href}>
               <Link
@@ -82,7 +91,7 @@ export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
                 href="/accounts"
                 className="px-3 py-2 rounded-md bg-accent text-bg font-semibold hover:bg-accent-strong transition-colors"
               >
-                Get an account
+                Get funded
               </Link>
             </>
           )}
