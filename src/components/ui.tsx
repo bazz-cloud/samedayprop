@@ -84,7 +84,14 @@ export function Callout({
   );
 }
 
-/** Label/value row used throughout the rule panels and dashboards. */
+/**
+ * Label/value row used throughout the rule panels and dashboards.
+ *
+ * An emphasised row is normally accent-green, but a NEGATIVE amount is never
+ * shown in green: a loss rendered in the same colour as a gain misreads at a
+ * glance, which matters most on exactly the figures that are emphasised.
+ * `negative` is detected from the rendered string so callers cannot forget it.
+ */
 export function DataRow({
   label,
   value,
@@ -96,19 +103,25 @@ export function DataRow({
   hint?: string;
   emphasis?: boolean;
 }) {
+  const isNegative =
+    (typeof value === 'string' || typeof value === 'number') &&
+    /^-|^\u2212|^\(.*\)$/.test(String(value).trim());
+
+  const valueClass = emphasis
+    ? isNegative
+      ? 'text-danger font-semibold'
+      : 'text-accent font-semibold'
+    : isNegative
+      ? 'text-danger'
+      : 'text-fg';
+
   return (
     <div className="flex items-start justify-between gap-4 py-2.5 border-b border-border last:border-0">
       <div className="min-w-0">
         <dt className={`text-sm ${emphasis ? 'text-fg font-medium' : 'text-fg-muted'}`}>{label}</dt>
         {hint && <p className="text-xs text-fg-subtle mt-0.5 leading-relaxed">{hint}</p>}
       </div>
-      <dd
-        className={`text-sm tnum shrink-0 text-right ${
-          emphasis ? 'text-accent font-semibold' : 'text-fg'
-        }`}
-      >
-        {value}
-      </dd>
+      <dd className={`text-sm tnum shrink-0 text-right ${valueClass}`}>{value}</dd>
     </div>
   );
 }
