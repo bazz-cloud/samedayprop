@@ -51,7 +51,7 @@ rows. When that happens, write a real migration rather than forcing it through.
 | `DATABASE_URL` | your Postgres URL (auto-injected if you used Vercel Storage) |
 | `SESSION_SECRET` | `openssl rand -base64 48` |
 | `CREDENTIAL_ENCRYPTION_KEY` | `openssl rand -base64 48` — a **different** value |
-| `APP_BASE_URL` | your deployment URL, e.g. `https://samedayprop.vercel.app` |
+| `APP_BASE_URL` | **skip it** — Vercel's own `VERCEL_URL` is used automatically. Set it only for a custom domain. |
 
 `APP_MODE=DEMO` is not a placeholder to upgrade when you feel ready. `PRODUCTION`
 refuses to boot without a real payment provider, a real trading provider and a
@@ -61,6 +61,12 @@ have provider test credentials.
 
 The two secrets must differ. Reusing one value means a single leak opens both
 sessions and stored platform credentials.
+
+`SESSION_SECRET` is required even in `DEMO` once the app is hosted. The built-in
+demo fallback is a constant in this public repository — serving it from a
+reachable hostname lets anyone forge a session cookie, the admin console
+included. The app refuses to boot rather than do that, so the deploy will fail
+visibly if you skip it.
 
 ### Leave these blank
 

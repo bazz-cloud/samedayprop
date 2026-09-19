@@ -76,6 +76,41 @@ function readCompany(): CompanyPlaceholders {
   return { name, legalEntity, jurisdiction, supportEmail, postalAddress, incomplete };
 }
 
+/**
+ * Where this deployment actually lives.
+ *
+ * Hosts inject their own URL rather than expecting it to be configured twice:
+ * Vercel sets VERCEL_PROJECT_PRODUCTION_URL for the stable production domain
+ * and VERCEL_URL for the per-deployment preview domain, neither with a scheme.
+ * Preferring them over a hardcoded default means preview deployments build
+ * links to themselves instead of to the production domain or to localhost.
+ */
+function readBaseUrl(): string {
+  const explicit = env('APP_BASE_URL');
+  if (explicit) return explicit.replace(/\/+$/, '');
+
+  const hosted = env('VERCEL_PROJECT_PRODUCTION_URL') ?? env('VERCEL_URL');
+  if (hosted) return `https://${hosted.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`;
+
+  return 'http://localhost:3000';
+}
+
+/**
+ * True only for a developer's own machine.
+ *
+ * Several defaults are safe on localhost and unsafe the moment the same build
+ * answers on a public hostname, so they key off this rather than off DEMO mode.
+ */
+function isLocalDevelopment(baseUrl: string): boolean {
+  if (env('VERCEL')) return false;
+  try {
+    const { hostname } = new URL(baseUrl);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
 function readMode(): AppMode {
   const raw = (env('APP_MODE') ?? 'DEMO').toUpperCase();
   if (raw === 'DEMO' || raw === 'SANDBOX' || raw === 'PRODUCTION') return raw;
@@ -123,9 +158,24 @@ export function getConfig(): AppConfig {
     }
   }
 
-  const sessionSecret = env('SESSION_SECRET') ?? (mode === 'DEMO' ? 'demo-only-insecure-secret' : '');
+  const baseUrl = readBaseUrl();
+  const localDevelopment = isLocalDevelopment(baseUrl);
+
+  // The demo fallback is a constant committed to a public repository. On
+  // localhost that costs nothing. On any reachable hostname it is a published
+  // signing key: anyone could mint a session cookie for any account, including
+  // the admin console. So the fallback exists only for local development.
+  const explicitSecret = env('SESSION_SECRET');
+  const sessionSecret =
+    explicitSecret ?? (mode === 'DEMO' && localDevelopment ? 'demo-only-insecure-secret' : '');
   if (!sessionSecret) {
-    throw new Error('SESSION_SECRET is required outside DEMO mode');
+    throw new Error(
+      mode === 'DEMO'
+        ? `SESSION_SECRET is required for a hosted deployment (${baseUrl}). The built-in demo ` +
+          'secret is a public constant, so sessions signed with it can be forged by anyone. ' +
+          'Generate one with: openssl rand -base64 48'
+        : 'SESSION_SECRET is required outside DEMO mode',
+    );
   }
 
   cached = {
@@ -134,8 +184,11 @@ export function getConfig(): AppConfig {
     providers,
     company: readCompany(),
     sessionSecret,
-    baseUrl: env('APP_BASE_URL') ?? 'http://localhost:3000',
-    secureCookies: mode !== 'DEMO' || Boolean(env('FORCE_SECURE_COOKIES')),
+    baseUrl,
+    // Anything not on a developer's own machine is served over HTTPS, so the
+    // session cookie carries Secure there regardless of mode. A demo deployment
+    // still has real session cookies worth protecting in transit.
+    secureCookies: mode !== 'DEMO' || !localDevelopment || Boolean(env('FORCE_SECURE_COOKIES')),
   };
   return cached;
 }
