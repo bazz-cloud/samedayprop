@@ -191,7 +191,7 @@ export function RulesBrowser({
                                     index === 0 ? 'text-left' : 'text-right'
                                   }`}
                                 >
-                                  {column.toUpperCase()}
+                                  {column}
                                 </th>
                               ))}
                             </tr>

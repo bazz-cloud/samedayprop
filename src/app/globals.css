@@ -189,6 +189,18 @@ h4,
   letter-spacing: -0.01em;
 }
 
+/*
+ * Table column headers.
+ *
+ * One rule rather than a .toUpperCase() at each call site, which is how two of
+ * them came to be missed. Scoped to `col` deliberately: a row header is a value
+ * — an account size, a symbol, a date — and uppercasing those would mangle them.
+ */
+th[scope='col'] {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* Small uppercase labels: ORDER SUMMARY, ROOM TO THE FLOOR. */
 .label {
   font-family: var(--font-mono);

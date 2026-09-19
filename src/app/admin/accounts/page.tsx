@@ -121,7 +121,7 @@ export default async function AdminAccountsPage() {
                   scope="col"
                   className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-bold tracking-wide text-fg-muted"
                 >
-                  {heading.toUpperCase()}
+                  {heading}
                 </th>
               ))}
             </tr>

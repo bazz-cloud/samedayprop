@@ -155,7 +155,7 @@ export function SpecTable({
                   column.numeric ? 'text-right' : 'text-left'
                 }`}
               >
-                {column.label.toUpperCase()}
+                {column.label}
               </th>
             ))}
           </tr>
