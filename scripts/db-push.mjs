@@ -50,14 +50,37 @@ if (direct) {
   );
 }
 
-// A push that would drop a populated column stops by default: silently losing
-// a column of a live database during a deploy is not a thing that should be
-// possible. When a schema change genuinely retires data — a withdrawn product,
-// a replaced column — set ALLOW_DB_DATA_LOSS=1 for that one deploy.
+/*
+ * A push that would drop a populated column needs permission.
+ *
+ * The rule follows APP_MODE, the same way the seed does:
+ *
+ *   DEMO       -> accepted automatically. A demo database holds fixtures that
+ *                 this very build is about to reseed. Failing the deploy to
+ *                 protect throwaway data would mean every column rename takes
+ *                 the site down until somebody notices, which is exactly what
+ *                 happened here.
+ *   otherwise  -> refused, unless ALLOW_DB_DATA_LOSS=1 is set deliberately for
+ *                 that one deploy. Silently dropping a column of a real
+ *                 customer database during a build is not a thing that should
+ *                 be possible.
+ */
+const mode = (process.env.APP_MODE ?? 'DEMO').toUpperCase();
+const allowLoss = mode === 'DEMO' || process.env.ALLOW_DB_DATA_LOSS === '1';
+
 const args = ['prisma', 'db', 'push', '--skip-generate'];
-if (process.env.ALLOW_DB_DATA_LOSS === '1') {
-  console.warn('\n  ALLOW_DB_DATA_LOSS=1: this push may drop columns or tables.\n');
+if (allowLoss) {
+  console.warn(
+    mode === 'DEMO'
+      ? '\n  APP_MODE=DEMO: accepting data loss on the demo database, which this build reseeds.\n'
+      : '\n  ALLOW_DB_DATA_LOSS=1: this push may drop columns or tables.\n',
+  );
   args.push('--accept-data-loss');
+} else {
+  console.log(
+    `\n  APP_MODE=${mode}: a push that would drop data will be refused.\n` +
+      '  Set ALLOW_DB_DATA_LOSS=1 for this deploy if that is what you intend.\n',
+  );
 }
 
 const result = spawnSync('npx', args, {

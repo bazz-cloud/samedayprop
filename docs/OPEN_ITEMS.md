@@ -126,10 +126,15 @@ Not your to-do list — mine, or things that need a migration you should approve
   $0 against $8,000 of paid orders. The admin console reports both sources and
   flags the disagreement rather than hiding it. Revenue posting belongs in
   provisioning, not only in live checkout.
-- **The next deploy needs `ALLOW_DB_DATA_LOSS=1` once.** The add-on table lost
-  two columns when the three candidate products were replaced. `db-push` refuses
-  a destructive push by default, which is the behaviour you want every other
-  time; set that variable for one deploy and then remove it.
+- **Deploys were failing on schema changes, and now are not.** Renaming a column
+  made `prisma db push` refuse ("use --accept-data-loss"), which failed the
+  build, so Vercel kept serving the last good deployment while every push looked
+  successful in git. `scripts/db-push.mjs` now follows APP_MODE the way the seed
+  does: DEMO accepts the loss automatically (the build reseeds that database
+  anyway), and SANDBOX or PRODUCTION still refuse unless `ALLOW_DB_DATA_LOSS=1`
+  is set deliberately. When you move off DEMO, expect to set that variable for
+  any deploy that drops a column — or move to real Prisma migrations, which is
+  the better answer once there is customer data to lose.
 - **No holiday calendar.** The session boundary is approved, but exchange
   holidays and per-instrument schedules are not loaded, so session dates are
   wrong on a holiday. Needs the exchange calendar.
