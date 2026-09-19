@@ -221,6 +221,19 @@ export function AccountConfigurator({
                 </span>{' '}
                 cash.
               </p>
+              {!plan.exampleIsMinimum && (
+                <p className="text-sm text-fg-muted mt-1 leading-relaxed">
+                  At <span className="text-fg tnum">{plan.exampleWithdrawalAt.display}</span> the
+                  same request is{' '}
+                  <span className="text-fg tnum">{plan.exampleWithdrawalGross.display}</span> gross
+                  &rarr;{' '}
+                  <span className="text-accent tnum font-semibold">
+                    {plan.exampleWithdrawalCash.display}
+                  </span>{' '}
+                  cash, inside this account&rsquo;s{' '}
+                  <span className="text-fg tnum">{plan.dailyCashCap.display}</span> daily cash cap.
+                </p>
+              )}
             </div>
 
             <dl className="mt-4">

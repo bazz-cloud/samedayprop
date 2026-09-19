@@ -71,6 +71,20 @@ export interface PlanView {
   readonly firstWithdrawalGross: SerialisedMoney;
   readonly firstWithdrawalCash: SerialisedMoney;
   readonly firstWithdrawalLeaves: SerialisedMoney;
+  /**
+   * A representative withdrawal for THIS account size, not the minimum one.
+   *
+   * The minimum ($500 gross / $250 cash) is the same on every plan, so showing
+   * it on a $300,000 account made the largest product look like the smallest.
+   * These figures scale with the account; `firstWithdrawal*` above still carry
+   * the minimum, and both are shown.
+   */
+  readonly exampleWithdrawalAt: SerialisedMoney;
+  readonly exampleWithdrawalGross: SerialisedMoney;
+  readonly exampleWithdrawalCash: SerialisedMoney;
+  readonly exampleWithdrawalLeaves: SerialisedMoney;
+  /** True when the example above IS the minimum, i.e. on the smallest account. */
+  readonly exampleIsMinimum: boolean;
   readonly keyFacts: readonly KeyFact[];
   readonly rules: readonly RuleLine[];
   readonly launchBlockers: readonly { field: string; status: string; detail: string }[];
@@ -99,6 +113,24 @@ function buildPlanView(plan: PlanDefinition): PlanView {
     .plus(plan.retainedBuffer.value)
     .plus(minimumGross);
   const firstWithdrawalLeaves = firstWithdrawalAt.minus(minimumGross);
+
+  // The scaled example: 2% of the nominal account size, rounded down to a whole
+  // $500 so it reads as a round number, floored at the published minimum and
+  // capped at one day's gross capacity so the example is a withdrawal that could
+  // actually be paid in a single day. On the $25,000 account this lands exactly
+  // on the minimum, which is why `exampleIsMinimum` exists rather than a
+  // hard-coded list of sizes.
+  const exampleGross = Money.min(
+    Money.max(
+      plan.startingBalance.mulRatio(2n, 100n, 'floor').floorToIncrement(minimumGross),
+      minimumGross,
+    ),
+    plan.dailyCashPayoutCap.value.timesInt(2),
+  );
+  const exampleWithdrawalAt = plan.startingBalance
+    .plus(plan.retainedBuffer.value)
+    .plus(exampleGross);
+  const exampleWithdrawalLeaves = exampleWithdrawalAt.minus(exampleGross);
 
   const rules: RuleLine[] = [
     {
@@ -289,6 +321,11 @@ function buildPlanView(plan: PlanDefinition): PlanView {
     firstWithdrawalGross: serialiseMoney(minimumGross),
     firstWithdrawalCash: serialiseMoney(minimumGross.halfExact()),
     firstWithdrawalLeaves: serialiseMoney(firstWithdrawalLeaves),
+    exampleWithdrawalAt: serialiseMoney(exampleWithdrawalAt),
+    exampleWithdrawalGross: serialiseMoney(exampleGross),
+    exampleWithdrawalCash: serialiseMoney(exampleGross.halfExact()),
+    exampleWithdrawalLeaves: serialiseMoney(exampleWithdrawalLeaves),
+    exampleIsMinimum: exampleGross.equals(minimumGross),
     keyFacts,
     rules,
     launchBlockers: blockers,

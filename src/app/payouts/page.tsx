@@ -96,21 +96,24 @@ export default function PayoutsPage() {
             { item: 'Starting simulated balance', amount: fiftyK.startingBalance.display },
             { item: 'Retained profit buffer', amount: fiftyK.retainedBuffer.display },
             { item: 'First payout available at', amount: fiftyK.firstWithdrawalAt.display },
-            { item: 'Gross withdrawal requested', amount: fiftyK.firstWithdrawalGross.display },
+            { item: 'Balance in this example', amount: fiftyK.exampleWithdrawalAt.display },
+            { item: 'Gross withdrawal requested', amount: fiftyK.exampleWithdrawalGross.display },
             {
               item: 'Real cash paid to you',
               amount: (
-                <span className="text-accent font-bold">{fiftyK.firstWithdrawalCash.display}</span>
+                <span className="text-accent font-bold">{fiftyK.exampleWithdrawalCash.display}</span>
               ),
             },
-            { item: 'Simulated balance remaining', amount: fiftyK.firstWithdrawalLeaves.display },
+            { item: 'Simulated balance remaining', amount: fiftyK.exampleWithdrawalLeaves.display },
             { item: 'Received by anyone else', amount: '$0.00' },
           ]}
         />
         <p className="no-caps text-sm text-fg-subtle leading-relaxed">
-          The other $250 is not income to us. It is simulated balance that ceases to exist. At{' '}
-          <span className="tnum">$52,499.00</span> the available gross would be $499, below the $500
-          minimum, so no payout is available yet.
+          The other {fiftyK.exampleWithdrawalCash.display} is not income to us. It is simulated
+          balance that ceases to exist. That amount is an example, not a minimum: the smallest
+          withdrawal on any account is {fiftyK.firstWithdrawalGross.display} gross for{' '}
+          {fiftyK.firstWithdrawalCash.display} cash. At <span className="tnum">$52,499.00</span> the
+          available gross would be $499, below the $500 minimum, so no payout is available yet.
         </p>
       </section>
 

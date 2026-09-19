@@ -27,9 +27,13 @@ export default function HomePage() {
     startingBalance: plan.startingBalance.display,
     retainedBuffer: plan.retainedBuffer.display,
     firstWithdrawalAt: plan.firstWithdrawalAt.display,
-    firstWithdrawalGross: plan.firstWithdrawalGross.display,
-    firstWithdrawalCash: plan.firstWithdrawalCash.display,
-    firstWithdrawalLeaves: plan.firstWithdrawalLeaves.display,
+    minimumGross: plan.firstWithdrawalGross.display,
+    minimumCash: plan.firstWithdrawalCash.display,
+    exampleAt: plan.exampleWithdrawalAt.display,
+    exampleGross: plan.exampleWithdrawalGross.display,
+    exampleCash: plan.exampleWithdrawalCash.display,
+    exampleLeaves: plan.exampleWithdrawalLeaves.display,
+    exampleIsMinimum: plan.exampleIsMinimum,
     lifetimeCap: plan.lifetimeCapResolved
       ? (plan.lifetimeCapDescription.split(' ')[0] ?? null)
       : null,
@@ -65,11 +69,10 @@ export default function HomePage() {
           <h2 id="how" className="text-2xl mb-5">
             How it works
           </h2>
-          <StatGrid>
+          <StatGrid columns={3}>
             <StatPair icon="1" label="Sign, then pay" />
-            <StatPair icon="2" label="Trade published limits" />
-            <StatPair icon="3" label="Request your payout" />
-            <StatPair icon="4" label="Cash, same day" />
+            <StatPair icon="2" label="Request your payout" />
+            <StatPair icon="3" label="Cash, same day" />
           </StatGrid>
           <p className="no-caps mt-4 text-sm text-fg-muted max-w-2xl">
             You sign the agreements before you are charged. Limits are enforced on our servers.{' '}
@@ -85,7 +88,7 @@ export default function HomePage() {
           </h2>
           <div className="max-w-2xl">
             <SpecTable
-              caption={`First withdrawal on the ${fiftyK.label} account`}
+              caption={`A withdrawal on the ${fiftyK.label} account`}
               columns={[
                 { key: 'item', label: 'Item' },
                 { key: 'amount', label: 'Amount', numeric: true },
@@ -94,23 +97,29 @@ export default function HomePage() {
                 { item: 'Starting simulated balance', amount: fiftyK.startingBalance.display },
                 { item: 'Retained profit buffer', amount: fiftyK.retainedBuffer.display },
                 { item: 'First withdrawal available at', amount: fiftyK.firstWithdrawalAt.display },
-                { item: 'Gross withdrawal requested', amount: fiftyK.firstWithdrawalGross.display },
+                { item: 'Balance in this example', amount: fiftyK.exampleWithdrawalAt.display },
+                { item: 'Gross withdrawal requested', amount: fiftyK.exampleWithdrawalGross.display },
                 {
                   item: 'Real cash paid to you',
                   amount: (
-                    <span className="text-accent font-bold">{fiftyK.firstWithdrawalCash.display}</span>
+                    <span className="text-accent font-bold">
+                      {fiftyK.exampleWithdrawalCash.display}
+                    </span>
                   ),
                 },
                 {
                   item: 'Simulated balance remaining',
-                  amount: fiftyK.firstWithdrawalLeaves.display,
+                  amount: fiftyK.exampleWithdrawalLeaves.display,
                 },
               ]}
             />
             <p className="no-caps mt-3 text-xs text-fg-subtle leading-relaxed">
-              The other {fiftyK.firstWithdrawalCash.display} is not paid to anyone. It is simulated
-              balance that ceases to exist. At <span className="tnum">$52,499.00</span> no
-              withdrawal is available: the available gross would be $499, below the $500 minimum.
+              The other {fiftyK.exampleWithdrawalCash.display} is not paid to anyone. It is
+              simulated balance that ceases to exist. The amount above is an example, not a
+              threshold: the smallest withdrawal on any account is{' '}
+              {fiftyK.firstWithdrawalGross.display} gross for {fiftyK.firstWithdrawalCash.display}{' '}
+              cash. At <span className="tnum">$52,499.00</span> no withdrawal is available: the
+              available gross would be $499, below the $500 minimum.
             </p>
           </div>
         </section>

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Money, usd } from '@/domain/money/money';
 import { allocateByWeight, allocateProportionally } from '@/domain/money/allocate';
-import { PLANS, couponPrice, getPlan } from '@/domain/catalog/plans';
+import { MINIMUM_GROSS_WITHDRAWAL, PLANS, couponPrice, getPlan } from '@/domain/catalog/plans';
+import { getPlanViews } from '@/server/views/catalog-view';
 import { buildQuote, canonicaliseQuote } from '@/domain/pricing/quote';
 import { DEFAULT_COUPON, normaliseCouponCode, validateCoupon } from '@/domain/pricing/coupon';
 import {
@@ -260,5 +261,70 @@ describe('production gating', () => {
   it('blocks on unconfigured tax rather than assuming zero tax is correct', () => {
     const quote = buildQuote({ selection: { planKey: 'SIM_50K', addOnKeys: [], couponCode: null }, coupon: null });
     expect(quote.productionBlockers.map((b) => b.code)).toContain('TAX_UNRESOLVED');
+  });
+});
+
+/**
+ * The worked example shown on the marketing pages.
+ *
+ * It scales with the account so a $300,000 account does not advertise the same
+ * $500 withdrawal as the cheapest one. That is a presentation choice with real
+ * constraints behind it: the example has to be a withdrawal we could actually
+ * pay, in one day, under the published caps. If a future edit makes the example
+ * bigger to make the page look better, these fail.
+ */
+describe('scaled withdrawal example', () => {
+  const views = getPlanViews();
+
+  it('shows the published minimum on the smallest account', () => {
+    const smallest = views.find((view) => view.key === 'SIM_25K')!;
+    expect(smallest.exampleWithdrawalGross.display).toBe('$500.00');
+    expect(smallest.exampleWithdrawalCash.display).toBe('$250.00');
+    expect(smallest.exampleIsMinimum).toBe(true);
+  });
+
+  it('never shows an example below the published minimum', () => {
+    for (const view of views) {
+      expect(Money.fromMinor(BigInt(view.exampleWithdrawalGross.minor)).gte(
+        MINIMUM_GROSS_WITHDRAWAL.value,
+      )).toBe(true);
+    }
+  });
+
+  it('never shows an example that one day of cash capacity could not pay', () => {
+    for (const view of views) {
+      const cash = Money.fromMinor(BigInt(view.exampleWithdrawalCash.minor));
+      const dailyCap = Money.fromMinor(BigInt(view.dailyCashCap.minor));
+      expect(cash.lte(dailyCap)).toBe(true);
+    }
+  });
+
+  it('keeps the example payable: whole dollars, exactly halvable, and reachable', () => {
+    for (const view of views) {
+      const gross = Money.fromMinor(BigInt(view.exampleWithdrawalGross.minor));
+      expect(gross.isMultipleOf(usd('1.00'))).toBe(true);
+      expect(gross.halfExact().equals(Money.fromMinor(BigInt(view.exampleWithdrawalCash.minor)))).toBe(
+        true,
+      );
+      // The balance quoted in the example must be exactly the balance that makes
+      // that withdrawal available: starting balance + buffer + gross.
+      const at = Money.fromMinor(BigInt(view.exampleWithdrawalAt.minor));
+      const leaves = Money.fromMinor(BigInt(view.exampleWithdrawalLeaves.minor));
+      expect(at.minus(gross).equals(leaves)).toBe(true);
+      expect(
+        leaves.equals(
+          Money.fromMinor(BigInt(view.startingBalance.minor)).plus(
+            Money.fromMinor(BigInt(view.retainedBuffer.minor)),
+          ),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it('grows with the account size', () => {
+    const gross = views.map((view) => BigInt(view.exampleWithdrawalGross.minor));
+    for (let index = 1; index < gross.length; index += 1) {
+      expect(gross[index]! > gross[index - 1]!).toBe(true);
+    }
   });
 });

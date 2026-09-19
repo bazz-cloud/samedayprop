@@ -1,15 +1,21 @@
 'use client';
 
 /**
- * The $500 → $250 calculator.
+ * The half-in-cash calculator.
  *
  * This arithmetic is the single most trust-critical thing on the site and it
  * previously read as fine print. A visitor who does not understand it before
  * buying becomes a support ticket after their first withdrawal.
  *
+ * The worked amount SCALES with the account: the $25,000 account shows the
+ * $500 → $250 minimum, and larger accounts show a withdrawal proportional to
+ * their size, capped at what one day's cash cap can actually pay. Showing the
+ * same $500 on every tier made the $300,000 account look identical to the
+ * cheapest one. The minimum is still stated underneath on every tier, because
+ * a bigger example must not read as a bigger floor.
+ *
  * Every figure is computed from the account's own published numbers, supplied
- * by the server. Nothing here invents a price or a limit, and the footnote is
- * verbatim.
+ * by the server. Nothing here invents a price or a limit.
  */
 
 import { useState } from 'react';
@@ -21,9 +27,13 @@ export interface CalculatorPlan {
   readonly startingBalance: string;
   readonly retainedBuffer: string;
   readonly firstWithdrawalAt: string;
-  readonly firstWithdrawalGross: string;
-  readonly firstWithdrawalCash: string;
-  readonly firstWithdrawalLeaves: string;
+  readonly minimumGross: string;
+  readonly minimumCash: string;
+  readonly exampleAt: string;
+  readonly exampleGross: string;
+  readonly exampleCash: string;
+  readonly exampleLeaves: string;
+  readonly exampleIsMinimum: boolean;
   readonly lifetimeCap: string | null;
 }
 
@@ -75,19 +85,32 @@ export function WithdrawalCalculator({
         </fieldset>
 
         <dl className="mt-5 space-y-0">
-          <Row label="Gross withdrawal" value={plan.firstWithdrawalGross} />
+          <Row label="Simulated balance in this example" value={plan.exampleAt} />
+          <Row label="Gross withdrawal" value={plan.exampleGross} />
           <div className="flex items-baseline justify-between gap-4 border-b border-border py-3">
             <dt className="no-caps text-sm font-bold">Real cash paid to you</dt>
-            <dd className="tnum text-[20px] font-bold text-accent">{plan.firstWithdrawalCash}</dd>
+            <dd className="tnum text-[20px] font-bold text-accent">{plan.exampleCash}</dd>
           </div>
-          <Row label="Simulated balance removed" value={`−${plan.firstWithdrawalGross}`} />
-          <Row label="Remaining simulated balance" value={plan.firstWithdrawalLeaves} last />
+          <Row label="Remaining simulated balance" value={plan.exampleLeaves} last />
         </dl>
 
         <p className="no-caps mt-4 text-xs text-fg-fine leading-relaxed">
-          The other {plan.firstWithdrawalCash} is not paid to anyone — it is simulated balance that
-          ceases to exist. First withdrawal unlocks at{' '}
-          <span className="tnum">{plan.firstWithdrawalAt}</span>.
+          The other {plan.exampleCash} is not paid to anyone — it is simulated balance that ceases
+          to exist. This is an example, not a floor or a target:{' '}
+          {plan.exampleIsMinimum ? (
+            <>
+              <span className="tnum">{plan.minimumGross}</span> gross is also the smallest
+              withdrawal on any account, and it unlocks at{' '}
+              <span className="tnum">{plan.firstWithdrawalAt}</span>.
+            </>
+          ) : (
+            <>
+              the smallest withdrawal on any account is{' '}
+              <span className="tnum">{plan.minimumGross}</span> gross for{' '}
+              <span className="tnum">{plan.minimumCash}</span> cash, available from{' '}
+              <span className="tnum">{plan.firstWithdrawalAt}</span>.
+            </>
+          )}
           {plan.lifetimeCap && (
             <>
               {' '}This account pays out up to <span className="tnum">{plan.lifetimeCap}</span> in

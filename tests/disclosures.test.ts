@@ -36,7 +36,33 @@ const REQUIRED: readonly { page: string; label: string; text: string }[] = [
   {
     page: 'src/app/payouts/page.tsx',
     label: 'the other half is not income to us',
-    text: 'The other $250 is not income to us. It is simulated balance that ceases to exist.',
+    // The figure is interpolated from the plan now that the worked example
+    // scales with account size, so the guard pins the sentence, not the number.
+    text: 'is not income to us. It is simulated balance that ceases to exist.',
+  },
+  // The worked examples show a withdrawal larger than the minimum on every
+  // account above $25,000. That is a presentation choice with a disclosure
+  // attached: a bigger example must never read as a bigger floor, so each page
+  // that scales its example has to keep saying what the minimum actually is.
+  {
+    page: 'src/app/payouts/page.tsx',
+    label: 'the scaled example is not the minimum',
+    text: 'That amount is an example, not a minimum: the smallest withdrawal on any account is',
+  },
+  {
+    page: 'src/app/page.tsx',
+    label: 'the scaled example is not the minimum',
+    text: 'The amount above is an example, not a threshold: the smallest withdrawal on any account is',
+  },
+  {
+    page: 'src/components/WithdrawalCalculator.tsx',
+    label: 'the scaled example is not the minimum',
+    text: 'This is an example, not a floor or a target:',
+  },
+  {
+    page: 'src/components/WithdrawalCalculator.tsx',
+    label: 'the minimum withdrawal is still stated',
+    text: 'the smallest withdrawal on any account is',
   },
   {
     page: 'src/app/payouts/page.tsx',

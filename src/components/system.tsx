@@ -229,8 +229,12 @@ export function StatPair({ icon, label }: { icon: string; label: string }) {
   );
 }
 
-export function StatGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
+export function StatGrid({ children, columns = 4 }: { children: ReactNode; columns?: 3 | 4 }) {
+  return (
+    <div className={`grid gap-3 sm:grid-cols-2 ${columns === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
+      {children}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
