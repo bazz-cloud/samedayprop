@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getFirmOverview } from '@/server/views/admin-analytics';
-import { requireUser } from '@/server/auth/session';
+import { ForbiddenError, UnauthorizedError, requireRole } from '@/server/auth/session';
 import { redirect } from 'next/navigation';
 import { getConfig } from '@/server/config';
 import { Money } from '@/domain/money/money';
@@ -45,8 +45,16 @@ function Stat({
 }
 
 export default async function AdminAnalyticsPage() {
-  const user = await requireUser();
-  if (user.role !== 'OWNER' && user.role !== 'FINANCE') redirect('/dashboard');
+  // requireRole, not a hand-rolled comparison: it ALSO refuses a privileged
+  // role that has not enrolled MFA. This page shows firm-wide revenue, open
+  // exposure and every cohort's economics.
+  try {
+    await requireRole('OWNER', 'FINANCE');
+  } catch (error) {
+    if (error instanceof UnauthorizedError) redirect('/login?next=%2Fadmin%2Fanalytics');
+    if (error instanceof ForbiddenError) redirect('/dashboard');
+    throw error;
+  }
 
   const config = getConfig();
   const overview = await getFirmOverview();

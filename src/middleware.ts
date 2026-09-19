@@ -139,9 +139,60 @@ function unlockPage(nextPath: string, failed: boolean): Response {
   });
 }
 
+
+/**
+ * Content-Security-Policy, with a fresh nonce per request.
+ *
+ * A nonce rather than 'unsafe-inline': Next injects its own bootstrap and
+ * hydration scripts inline, and allowing all inline script to accommodate them
+ * would disable the main thing a CSP is for. Next reads the nonce from this
+ * header and stamps it onto the scripts it generates.
+ *
+ * 'strict-dynamic' lets those trusted scripts load the chunks they need without
+ * enumerating every hashed filename here.
+ *
+ * `style-src` keeps 'unsafe-inline'. Styles cannot currently be nonced through
+ * Next's style pipeline, and an injected stylesheet is a far smaller problem
+ * than injected script.
+ */
+function contentSecurityPolicy(nonce: string, isDev: boolean): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''}`.trim(),
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    // No third-party calls are made from the browser. If a payment provider's
+    // hosted fields are added later, its origin goes here and nowhere else.
+    "connect-src 'self'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    'upgrade-insecure-requests',
+  ].join('; ');
+}
+
+/** Attach the policy to a response on its way out, whatever kind it is. */
+function withSecurityHeaders<T extends Response>(response: T, nonce: string): T {
+  response.headers.set(
+    'Content-Security-Policy',
+    contentSecurityPolicy(nonce, process.env.NODE_ENV !== 'production'),
+  );
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
+  // 128 bits of randomness per request. Reusing a nonce across requests would
+  // make it guessable and therefore useless.
+  const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
+  const forwarded = new Headers(request.headers);
+  forwarded.set('x-nonce', nonce);
+  const pass = () => NextResponse.next({ request: { headers: forwarded } });
+
   const password = process.env.SITE_PASSWORD;
-  if (!password || password.trim() === '') return NextResponse.next();
+  if (!password || password.trim() === '') return withSecurityHeaders(pass(), nonce);
 
   const token = await expectedToken(password);
   const presented = request.cookies.get(COOKIE)?.value;
@@ -151,7 +202,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === UNLOCK_PATH) {
     if (request.method !== 'POST') {
-      return NextResponse.redirect(new URL('/', request.url));
+      return withSecurityHeaders(NextResponse.redirect(new URL('/', request.url)), nonce);
     }
     const form = await request.formData();
     const submitted = String(form.get('password') ?? '');
@@ -160,7 +211,7 @@ export async function middleware(request: NextRequest) {
     // Compare digests rather than the passwords themselves.
     const submittedToken = await hmacHex(submitted, TOKEN_VERSION);
     if (!timingSafeEqual(submittedToken, token)) {
-      return unlockPage(nextPath, true);
+      return withSecurityHeaders(unlockPage(nextPath, true), nonce);
     }
 
     const response = NextResponse.redirect(new URL(nextPath, request.url), 303);
@@ -171,12 +222,12 @@ export async function middleware(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
-    return response;
+    return withSecurityHeaders(response, nonce);
   }
 
-  if (unlocked) return NextResponse.next();
+  if (unlocked) return withSecurityHeaders(pass(), nonce);
 
-  return unlockPage(`${pathname}${search}`, false);
+  return withSecurityHeaders(unlockPage(`${pathname}${search}`, false), nonce);
 }
 
 export const config = {

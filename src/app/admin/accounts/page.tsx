@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getAccountRows } from '@/server/views/admin-analytics';
-import { requireUser } from '@/server/auth/session';
+import { ForbiddenError, UnauthorizedError, requireRole } from '@/server/auth/session';
 import { getConfig } from '@/server/config';
 import { Money } from '@/domain/money/money';
 import { HeadroomBar } from '@/components/admin/HeadroomBar';
@@ -21,9 +21,16 @@ const fmt = (minor: bigint) => Money.fromMinor(minor).format();
  * sorting by creation date buries them.
  */
 export default async function AdminAccountsPage() {
-  const user = await requireUser();
-  if (user.role !== 'OWNER' && user.role !== 'FINANCE' && user.role !== 'RISK') {
-    redirect('/dashboard');
+  // requireRole, not a hand-rolled comparison: it ALSO refuses a
+  // privileged role that has not enrolled MFA. This page shows every
+  // customer's balance, email and payout history.
+  let user;
+  try {
+    user = await requireRole('OWNER', 'FINANCE', 'RISK');
+  } catch (error) {
+    if (error instanceof UnauthorizedError) redirect('/login?next=%2Fadmin%2Faccounts');
+    if (error instanceof ForbiddenError) redirect('/dashboard');
+    throw error;
   }
 
   const config = getConfig();
