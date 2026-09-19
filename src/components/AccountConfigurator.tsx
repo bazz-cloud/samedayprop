@@ -298,9 +298,6 @@ export function AccountConfigurator({
               <legend className="sr-only">Optional extras</legend>
               {addOns.map((addon) => {
                 const selected = selectedAddOns.includes(addon.key);
-                // Priced per plan, so the figure follows the account size
-                // selected in step 1 rather than quoting one flat number.
-                const price = addon.pricesByPlan.find((entry) => entry.planKey === planKey);
                 return (
                   <label
                     key={addon.key}
@@ -320,14 +317,12 @@ export function AccountConfigurator({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                           <span className="font-bold">{addon.name}</span>
-                          {price && (
-                            <span className="tnum shrink-0 text-sm">
-                              <span className="was-price mr-2">{price.listPrice.display}</span>
-                              <span className="font-bold text-accent">
-                                +{price.couponPrice.display}
-                              </span>
+                          <span className="tnum shrink-0 text-sm">
+                            <span className="was-price mr-2">{addon.listPrice.display}</span>
+                            <span className="font-bold text-accent">
+                              +{addon.couponPrice.display}
                             </span>
-                          )}
+                          </span>
                         </div>
                         <p className="text-sm text-fg-muted mt-1.5">{addon.effect} for the life of the account.</p>
                         {/* The limitation sits with the price, at the same size

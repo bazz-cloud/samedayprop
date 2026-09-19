@@ -21,9 +21,12 @@
  *     descriptions say so, because an "upgrade" that quietly shortens the
  *     average account life would be the most cynical thing on the site.
  *
- * Prices are PER PLAN, not flat: two extra contracts on a $25,000 account is a
- * different product from two extra on a $300,000 account, and one price across
- * a twelve-fold range would be wrong at both ends.
+ * PRICES ARE FLAT, by owner decision 2026-09-19: $50 and $30 on every account
+ * size. Worth recording what that means, since it was a considered choice
+ * against the alternative: the same +50% uplift is $340 -> $510 on the smallest
+ * account and $2,125 -> $3,187.50 on the largest, so the firm sells roughly six
+ * times the allowance for the same fifty dollars at the top of the range. One
+ * price is simpler to state and nobody has to ask why their upgrade costs more.
  *
  * Design constraint carried through the whole system: no add-on may gate normal
  * account access, rule visibility, payout eligibility, basic statistics, basic
@@ -31,8 +34,7 @@
  */
 
 import { Money, usd } from '../money/money';
-import { proposed, type Governed } from '../config/requirement-status';
-import type { PlanKey } from './plans';
+import { confirmed, type Governed } from '../config/requirement-status';
 
 export type AddOnKey = 'DAILY_LOSS_UPLIFT' | 'EXTRA_CONTRACTS';
 
@@ -69,8 +71,8 @@ export interface AddOnDefinition {
    * thinks they are buying a better chance of a payout has been misled.
    */
   readonly limitation: string;
-  /** One-time price per plan. Larger accounts pay more for the same uplift. */
-  readonly listPriceByPlan: Governed<Readonly<Record<PlanKey, Money>>>;
+  /** One-time price, the same on every account size. */
+  readonly listPrice: Governed<Money>;
   readonly delivery: AddOnDelivery;
   readonly effect: AddOnEffect;
   /**
@@ -82,7 +84,7 @@ export interface AddOnDefinition {
   readonly couponEligible: boolean;
 }
 
-const OWNER_SCOPE = 'Owner decision 2026-09-19 — two risk add-ons; prices await approval';
+const OWNER_SCOPE = 'Owner decision 2026-09-19 — two risk add-ons, flat pricing';
 
 export const ADDONS: readonly AddOnDefinition[] = [
   {
@@ -95,17 +97,7 @@ export const ADDONS: readonly AddOnDefinition[] = [
       'It does not change your trailing drawdown, your payout caps or your split. A larger ' +
       'daily allowance means a larger single-day loss is possible, so it can reach the drawdown ' +
       'threshold sooner rather than later.',
-    listPriceByPlan: proposed(
-      {
-        SIM_25K: usd('49.00'),
-        SIM_50K: usd('79.00'),
-        SIM_100K: usd('129.00'),
-        SIM_150K: usd('179.00'),
-        SIM_300K: usd('249.00'),
-      },
-      'Prices for the daily-loss uplift are drafted and await owner approval.',
-      OWNER_SCOPE,
-    ),
+    listPrice: confirmed(usd('50.00'), 'Flat $50 on every account size.', OWNER_SCOPE),
     delivery: { kind: 'risk-parameter' },
     effect: { kind: 'daily-loss-uplift', percentOfBase: 50n },
     requiresCapacityCheck: false,
@@ -119,17 +111,7 @@ export const ADDONS: readonly AddOnDefinition[] = [
     limitation:
       'It does not change your drawdown allowance, your daily loss limit or your payout caps. ' +
       'The same move in bigger size reaches your threshold in fewer ticks.',
-    listPriceByPlan: proposed(
-      {
-        SIM_25K: usd('69.00'),
-        SIM_50K: usd('99.00'),
-        SIM_100K: usd('169.00'),
-        SIM_150K: usd('229.00'),
-        SIM_300K: usd('329.00'),
-      },
-      'Prices for the extra-contracts add-on are drafted and await owner approval.',
-      OWNER_SCOPE,
-    ),
+    listPrice: confirmed(usd('30.00'), 'Flat $30 on every account size.', OWNER_SCOPE),
     delivery: { kind: 'risk-parameter' },
     effect: { kind: 'extra-contracts', extraMinis: 2 },
     requiresCapacityCheck: false,
@@ -147,13 +129,6 @@ export function getAddOn(key: AddOnKey): AddOnDefinition {
 
 export function isAddOnKey(value: string): value is AddOnKey {
   return ADDONS_BY_KEY.has(value as AddOnKey);
-}
-
-/** The one-time price of an add-on on a given plan. */
-export function addOnPrice(addon: AddOnDefinition, planKey: PlanKey): Money {
-  const price = addon.listPriceByPlan.value[planKey];
-  if (!price) throw new Error(`Add-on ${addon.key} has no price for plan ${planKey}`);
-  return price;
 }
 
 /**

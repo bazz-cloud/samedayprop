@@ -236,10 +236,9 @@ model AddOnVersion {
   description           String
   /// What the add-on does NOT do, shown beside the price.
   limitation            String   @default("")
-  /// JSON map of plan key -> price in minor units. Add-ons that change risk
-  /// terms are priced per plan: two contracts on $25,000 is not the same
-  /// product as two contracts on $300,000.
-  listPricesJson        String   @default("{}")
+  /// One-time price in minor units. Flat across account sizes by owner
+  /// decision, so no per-plan map.
+  listPriceMinor        BigInt   @default(0)
   deliveryKind          String // download | timed-entitlement | scheduled-session | risk-parameter
   deliveryDays          Int?
   deliveryMinutes       Int?

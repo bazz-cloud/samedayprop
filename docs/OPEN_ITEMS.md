@@ -18,6 +18,8 @@ commercial decision, or a credential I must never hold.
 | **START25 confirmed** | Unlimited uses, no per-customer limit, no expiry. Not auto-applied; typed in at checkout. Effectively the price, so the stress model uses the discounted figure. |
 | Add-ons replaced | Two risk upgrades — bigger daily loss limit, two more contracts — replacing the journal/analytics/setup candidates. **Prices are drafted and need your approval.** |
 | Items 8–11 confirmed | Session boundary, whole-dollar increments, $0.01 post-withdrawal room, reset restores to starting balance. |
+| **Add-on prices confirmed** | Flat $50 (bigger daily loss limit) and $30 (two more contracts), the same on every account size. Clears `ADDON_PRICE_PROPOSED`. |
+| **Company identity** | Bull Rush Prop LLC, Michigan, admin@bullrushfutures.com. Postal address still outstanding. |
 
 ## 1. Blocks taking real money
 
@@ -26,6 +28,7 @@ commercial decision, or a credential I must never hold.
 | **Add-on prices** — two risk upgrades, five plans each | Drafted at $49–$249 (daily loss uplift) and $69–$329 (two contracts), scaling with account size. PROPOSED, so any order containing one is blocked from production sale. |
 | **Sales tax: is this fee taxable in Michigan?** | Michigan taxes tangible property and prewritten software delivered electronically, not most services. An accountant has to answer it; the 6% is being charged meanwhile. |
 | **Sales tax: destination or origin?** | Sales tax is normally destination-based. We charge 6% to every buyer regardless of state, as instructed. Switching needs only the buyer's region, which the profile already stores. |
+| **Postal address** — the only company field still missing | Supplied 2026-09-19: Bull Rush Prop LLC, Michigan, admin@bullrushfutures.com. The address was given as "no address", so it is deliberately left unset and the launch gate still reports the company as incomplete. Your Michigan LLC filing carries a registered office address; that is the one the agreements need. |
 | **Company legal details** — entity name, jurisdiction, registered address, support email | Agreements have no counterparty on them. Also blocks governing law, arbitration and tax clauses, which all depend on jurisdiction. | Not started |
 | **Payment provider** | No hosted checkout. `PAYMENTS_*` blank selects the mock; setting them selects an adapter that is not implemented and throws by design. | Not started |
 | **Cash payout rail** | Nothing can pay a trader. The console produces a payout instruction; a human executes it somewhere. | Not started |

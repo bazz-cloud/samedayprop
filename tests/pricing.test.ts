@@ -84,7 +84,7 @@ describe('all six 25% coupon prices match the confirmed table exactly', () => {
 });
 
 describe('quote composition', () => {
-  it('$50K plus both risk add-ons is $582.75 before tax and $617.72 after', () => {
+  it('$50K plus both risk add-ons is $509.25 before tax and $539.81 after', () => {
     const quote = buildQuote({
       selection: {
         planKey: 'SIM_50K',
@@ -93,30 +93,38 @@ describe('quote composition', () => {
       },
       coupon,
     });
-    // 599 + 79 + 99 = 777, less 25%, plus 6%.
-    expect(quote.subtotal.toDecimalString()).toBe('777.00');
-    expect(quote.discountTotal.toDecimalString()).toBe('194.25');
-    expect(quote.taxableTotal.toDecimalString()).toBe('582.75');
-    expect(quote.total.toDecimalString()).toBe('617.72');
+    // 599 + 50 + 30 = 679, less 25%, plus 6%.
+    expect(quote.subtotal.toDecimalString()).toBe('679.00');
+    expect(quote.discountTotal.toDecimalString()).toBe('169.75');
+    expect(quote.taxableTotal.toDecimalString()).toBe('509.25');
+    expect(quote.total.toDecimalString()).toBe('539.81');
     expect(quote.taxableTotal.equals(EXAMPLE_FIFTY_K_WITH_ALL_ADDONS.expectedTaxableTotal)).toBe(
       true,
     );
     expect(quote.total.equals(EXAMPLE_FIFTY_K_WITH_ALL_ADDONS.expectedTotal)).toBe(true);
   });
 
-  it('prices an add-on against the plan it is bought with, not a flat figure', () => {
-    const small = buildQuote({
-      selection: { planKey: 'SIM_25K', addOnKeys: ['EXTRA_CONTRACTS'], couponCode: null },
+  it('charges the same for an add-on on every account size', () => {
+    // Owner decision: flat pricing. The uplift it buys is not flat — +50% of the
+    // daily loss limit is $170 on the smallest account and $1,062.50 on the
+    // largest — so this test is the record that the difference was intended.
+    const priceOf = (planKey: 'SIM_25K' | 'SIM_300K', key: 'DAILY_LOSS_UPLIFT' | 'EXTRA_CONTRACTS') =>
+      buildQuote({ selection: { planKey, addOnKeys: [key], couponCode: null }, coupon: null })
+        .lines.find((line) => line.itemKey === key)!
+        .lineSubtotal.toDecimalString();
+
+    expect(priceOf('SIM_25K', 'DAILY_LOSS_UPLIFT')).toBe('50.00');
+    expect(priceOf('SIM_300K', 'DAILY_LOSS_UPLIFT')).toBe('50.00');
+    expect(priceOf('SIM_25K', 'EXTRA_CONTRACTS')).toBe('30.00');
+    expect(priceOf('SIM_300K', 'EXTRA_CONTRACTS')).toBe('30.00');
+  });
+
+  it('no longer blocks production sale on add-on pricing, now that it is approved', () => {
+    const quote = buildQuote({
+      selection: { planKey: 'SIM_50K', addOnKeys: ['DAILY_LOSS_UPLIFT'], couponCode: null },
       coupon: null,
     });
-    const large = buildQuote({
-      selection: { planKey: 'SIM_300K', addOnKeys: ['EXTRA_CONTRACTS'], couponCode: null },
-      coupon: null,
-    });
-    const priceOf = (q: typeof small) =>
-      q.lines.find((line) => line.itemKey === 'EXTRA_CONTRACTS')!.lineSubtotal.toDecimalString();
-    expect(priceOf(small)).toBe('69.00');
-    expect(priceOf(large)).toBe('329.00');
+    expect(quote.productionBlockers.map((b) => b.code)).not.toContain('ADDON_PRICE_PROPOSED');
   });
 
   it('allocates the discount across lines so the parts sum to the whole', () => {
@@ -132,13 +140,13 @@ describe('quote composition', () => {
     expect(summed.equals(quote.discountTotal)).toBe(true);
     expect(quote.lines.map((l) => l.lineDiscount.toDecimalString())).toEqual([
       '149.75',
-      '19.75',
-      '24.75',
+      '12.50',
+      '7.50',
     ]);
     expect(quote.lines.map((l) => l.lineTotal.toDecimalString())).toEqual([
       '449.25',
-      '59.25',
-      '74.25',
+      '37.50',
+      '22.50',
     ]);
   });
 

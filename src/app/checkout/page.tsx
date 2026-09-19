@@ -7,7 +7,6 @@ import { createQuote, requiredDocuments } from '@/server/services/checkout-servi
 import { couponPrice, getPlan, isPlanKey } from '@/domain/catalog/plans';
 import {
   ADDONS,
-  addOnPrice,
   applyRiskDeltas,
   isAddOnKey,
   riskDeltasFor,
@@ -130,7 +129,7 @@ export default async function CheckoutPage({
   // place rather than appearing and disappearing from the page.
   const upsellOptions: UpsellOption[] = ADDONS.map((addon) => {
     const selected = addOnKeys.includes(addon.key);
-    const list = addOnPrice(addon, planKey);
+    const list = addon.listPrice.value;
     const after = applyRiskDeltas(
       {
         dailyLossLimit: basePlan.dailyLossLimit.value,

@@ -18,7 +18,7 @@ import {
   planLaunchBlockers,
   type PlanDefinition,
 } from '@/domain/catalog/plans';
-import { ADDONS, addOnPrice } from '@/domain/catalog/addons';
+import { ADDONS } from '@/domain/catalog/addons';
 import { DEFAULT_COUPON } from '@/domain/pricing/coupon';
 import { serialiseMoney, type SerialisedMoney } from '@/server/money-mapper';
 import {
@@ -109,13 +109,9 @@ export interface AddOnView {
   readonly description: string;
   /** What it does not do. Shown beside the price, never in a tooltip. */
   readonly limitation: string;
-  /** The price on each plan, cheapest first. */
-  readonly pricesByPlan: readonly {
-    planKey: string;
-    planLabel: string;
-    listPrice: SerialisedMoney;
-    couponPrice: SerialisedMoney;
-  }[];
+  /** One price, the same on every account size. */
+  readonly listPrice: SerialisedMoney;
+  readonly couponPrice: SerialisedMoney;
   /** One line describing the change to the account's limits. */
   readonly effect: string;
   readonly delivery: string;
@@ -382,15 +378,8 @@ export function getAddOnViews(): AddOnView[] {
     name: addon.name,
     description: addon.description,
     limitation: addon.limitation,
-    pricesByPlan: PLANS.map((plan) => {
-      const price = addOnPrice(addon, plan.key);
-      return {
-        planKey: plan.key,
-        planLabel: plan.label,
-        listPrice: serialiseMoney(price),
-        couponPrice: serialiseMoney(couponPrice(price, percent)),
-      };
-    }),
+    listPrice: serialiseMoney(addon.listPrice.value),
+    couponPrice: serialiseMoney(couponPrice(addon.listPrice.value, percent)),
     effect:
       addon.effect.kind === 'daily-loss-uplift'
         ? `Daily loss limit +${addon.effect.percentOfBase}%`
@@ -404,7 +393,7 @@ export function getAddOnViews(): AddOnView[] {
             ? `One scheduled ${addon.delivery.minutes}-minute session, subject to available slots.`
             : 'Applied to your account when it is created. Lasts the life of the account.',
     requiresCapacityCheck: addon.requiresCapacityCheck,
-    status: addon.listPriceByPlan.status,
+    status: addon.listPrice.status,
   }));
 }
 

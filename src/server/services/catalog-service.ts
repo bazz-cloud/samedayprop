@@ -145,14 +145,7 @@ export async function publishCatalogIfEmpty(): Promise<{ plans: number; addons: 
         name: addon.name,
         description: addon.description,
         limitation: addon.limitation,
-        listPricesJson: JSON.stringify(
-          Object.fromEntries(
-            Object.entries(addon.listPriceByPlan.value).map(([key, price]) => [
-              key,
-              price.minor.toString(),
-            ]),
-          ),
-        ),
+        listPriceMinor: addon.listPrice.value.minor,
         deliveryKind: addon.delivery.kind,
         deliveryDays: addon.delivery.kind === 'timed-entitlement' ? addon.delivery.days : null,
         deliveryMinutes:
@@ -166,7 +159,7 @@ export async function publishCatalogIfEmpty(): Promise<{ plans: number; addons: 
         requiresCapacityCheck: addon.requiresCapacityCheck,
         couponEligible: addon.couponEligible,
         status: 'PUBLISHED',
-        sellableInProduction: addon.listPriceByPlan.status === 'CONFIRMED',
+        sellableInProduction: addon.listPrice.status === 'CONFIRMED',
       },
     });
     addons += 1;
