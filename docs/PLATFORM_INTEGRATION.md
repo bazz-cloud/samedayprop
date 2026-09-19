@@ -89,11 +89,24 @@ Tradovate publishes a **Partner API** aimed at prop firms, at
   and never a reusable emailed password. Confirm what Tradovate actually
   returns — an invitation, a token, or a password — and keep the
   `accessDelivery` union honest about it.
-- **The market data agreement is a second signature, with Tradovate, not us.**
-  Our checkout collects one signature for our own documents. Where the trader
-  signs Tradovate's agreement, and what the account looks like between purchase
-  and that signature, is an unanswered product question. It is the single most
-  likely cause of a stuck "paid but not tradeable" account.
+- **The market data agreement is a second signature, with Tradovate, not us —
+  and it is signed IN TRADOVATE.** Owner decision, 2026-09-19: the trader signs
+  it on first sign-in to Tradovate. Our checkout does not collect it and must
+  never appear to.
+
+  That decision has a consequence the product has to carry rather than hide:
+  there is a real state where the account is paid for, provisioned, risk-limited
+  and "active" on our side, and still cannot receive market data because the
+  trader has not signed Tradovate's agreement yet. We cannot complete that step
+  and we cannot observe it until the entitlement API is wired up.
+
+  So it is shown as a step we do not own. The platform chooser at checkout says
+  it before purchase, the "what happens next" list says it after, and the
+  provisioning status page carries it as a final step that is **never marked
+  done** — because marking it done would be a claim about something happening
+  inside someone else's system. When the real adapter exists, the
+  `marketDataEntitlements` capability is what turns that from an instruction
+  into an observed fact.
 - Every capability in `src/server/providers/trading/tradovate.ts` stays
   `UNVERIFIED` until a real call is made against a real key. The adapter throws
   rather than returning a plausible success.

@@ -205,7 +205,11 @@ export function NextSteps({ isDemo }: { isDemo: boolean }) {
   const steps = [
     ['Sign', 'One PDF covering every document, bound to this exact price.'],
     ['Pay', isDemo ? 'Simulated in demonstration mode — no money moves.' : 'On our provider’s hosted page. No card details touch this site.'],
-    ['Trade', 'Sign-in details are shown once, on screen, never emailed.'],
+    ['Sign in', 'Details are shown once, on screen, never emailed.'],
+    [
+      'Accept the data agreement',
+      'Tradovate asks you to sign its market data agreement on first sign-in. Until you do, the account cannot receive market data.',
+    ],
   ] as const;
 
   return (

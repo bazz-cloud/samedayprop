@@ -83,6 +83,19 @@ export default async function CheckoutStatusPage({
       done: state === 'active',
       current: state === 'risk_verified',
     },
+    {
+      // Never `done`. This one is not ours to complete and we must not imply
+      // it has happened: the trader signs Tradovate's market data agreement
+      // inside Tradovate, on first sign-in, and an account that has not had it
+      // signed will not receive market data however green the steps above look.
+      label: 'Sign the market data agreement, in Tradovate',
+      done: false,
+      current: state === 'active',
+      note:
+        'Tradovate asks you to sign its non-professional market data agreement the first time ' +
+        'you sign in. That agreement is between you and Tradovate. We cannot sign it for you, ' +
+        'and until it is signed the account will not receive market data.',
+    },
   ];
 
   return (

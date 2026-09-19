@@ -50,16 +50,16 @@ export const PLATFORMS: Governed<readonly PlatformDefinition[]> = external(
       name: 'Tradovate',
       summary: 'Web, desktop and mobile. Included with every account.',
       note:
-        'Tradovate requires you to sign its own non-professional market data agreement before ' +
-        'the account can be entitled. That is between you and Tradovate, and it is separate ' +
-        'from the agreements you sign with us.',
+        'The first time you sign in to Tradovate you will be asked to sign its non-professional ' +
+        'market data agreement. You sign that one inside Tradovate, not here, and until you do ' +
+        'the account cannot receive market data.',
       reachableFromThisApp: true,
       outstanding: [
-        'Register as a Tradovate partner and obtain a partner API key.',
+        'Obtain organization admin credentials, an API key and a CID from an ' +
+          'Evaluation Support representative.',
         'Pass Tradovate conformance testing, which begins with authentication.',
         'Beta test the production key for at least a week before taking real orders.',
-        'Confirm which entitlement a simulated prop account needs, and how the ' +
-          'trader signs the non-professional market data agreement inside our flow.',
+        'Confirm which entitlement a simulated prop account needs.',
       ],
     },
     {
