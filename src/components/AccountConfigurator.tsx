@@ -189,6 +189,67 @@ export function AccountConfigurator({
             </p>
           </section>
 
+          {/* The selected account's figures, immediately under the choice that
+              produced them. This used to sit in the sidebar, which on a phone
+              put it below the extras and the coupon — a long way from the tap
+              that changed it. */}
+
+          {/* Six figures and the first-withdrawal example. The explanations
+              live on /rules — someone comparing account sizes is scanning
+              numbers, and a paragraph beside each one buries them. */}
+          <section
+            aria-labelledby="rules-heading"
+            className="rounded-xl border border-border bg-surface p-5"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 id="rules-heading" className="text-lg font-semibold tracking-tight">
+                {plan.label} at a glance
+              </h2>
+              <a href="/rules" className="text-sm text-accent hover:underline shrink-0">
+                Full rules
+              </a>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-accent/30 bg-accent-dim/20 p-3">
+              <p className="text-sm font-medium text-accent">First payout</p>
+              <p className="text-sm text-fg-muted mt-1 leading-relaxed">
+                At <span className="text-fg tnum">{plan.firstWithdrawalAt.display}</span> you can
+                take <span className="text-fg tnum">{plan.firstWithdrawalGross.display}</span>{' '}
+                gross &rarr;{' '}
+                <span className="text-accent tnum font-semibold">
+                  {plan.firstWithdrawalCash.display}
+                </span>{' '}
+                cash.
+              </p>
+            </div>
+
+            <dl className="mt-4">
+              {plan.keyFacts.map((fact) => (
+                <div
+                  key={fact.label}
+                  className="flex items-baseline justify-between gap-3 py-2.5 border-b border-border last:border-0"
+                >
+                  <dt className="text-sm text-fg-muted">{fact.label}</dt>
+                  <dd className="text-sm font-medium tnum text-right">
+                    {fact.value}
+                    {fact.status !== 'CONFIRMED' && (
+                      <span className="block text-[11px] font-normal text-warn mt-0.5">
+                        {statusLabel(fact.status)}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+
+            {/* The "no evaluation / no consistency / no minimum days" line is
+                cut: it is the stat grid on the home page and the legend above.
+                The nominal-figure sentence stays — it is a disclosure. */}
+            <p className="no-caps mt-4 text-xs text-fg-subtle leading-relaxed">
+              Simulated account; the balance is a nominal figure, not cash held for you.
+            </p>
+          </section>
+
           <section aria-labelledby="platform-heading">
             <SectionHeading
               number={2}
@@ -410,62 +471,6 @@ export function AccountConfigurator({
                   trading account.
                 </p>
               )}
-            </section>
-
-            {/* Six figures and the first-withdrawal example. The explanations
-                live on /rules — someone comparing account sizes is scanning
-                numbers, and a paragraph beside each one buries them. */}
-            <section
-              aria-labelledby="rules-heading"
-              className="rounded-xl border border-border bg-surface p-5"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 id="rules-heading" className="text-lg font-semibold tracking-tight">
-                  {plan.label} at a glance
-                </h2>
-                <a href="/rules" className="text-sm text-accent hover:underline shrink-0">
-                  Full rules
-                </a>
-              </div>
-
-              <div className="mt-4 rounded-lg border border-accent/30 bg-accent-dim/20 p-3">
-                <p className="text-sm font-medium text-accent">First payout</p>
-                <p className="text-sm text-fg-muted mt-1 leading-relaxed">
-                  At <span className="text-fg tnum">{plan.firstWithdrawalAt.display}</span> you can
-                  take <span className="text-fg tnum">{plan.firstWithdrawalGross.display}</span>{' '}
-                  gross &rarr;{' '}
-                  <span className="text-accent tnum font-semibold">
-                    {plan.firstWithdrawalCash.display}
-                  </span>{' '}
-                  cash.
-                </p>
-              </div>
-
-              <dl className="mt-4">
-                {plan.keyFacts.map((fact) => (
-                  <div
-                    key={fact.label}
-                    className="flex items-baseline justify-between gap-3 py-2.5 border-b border-border last:border-0"
-                  >
-                    <dt className="text-sm text-fg-muted">{fact.label}</dt>
-                    <dd className="text-sm font-medium tnum text-right">
-                      {fact.value}
-                      {fact.status !== 'CONFIRMED' && (
-                        <span className="block text-[11px] font-normal text-warn mt-0.5">
-                          {statusLabel(fact.status)}
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-
-              {/* The "no evaluation / no consistency / no minimum days" line is
-                  cut: it is the stat grid on the home page and the legend above.
-                  The nominal-figure sentence stays — it is a disclosure. */}
-              <p className="no-caps mt-4 text-xs text-fg-subtle leading-relaxed">
-                Simulated account; the balance is a nominal figure, not cash held for you.
-              </p>
             </section>
 
             {preview && preview.productionBlockers.length > 0 && (

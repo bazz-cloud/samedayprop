@@ -49,6 +49,20 @@ export default function AccountsPage() {
           </Link>
         </p>
 
+      </div>
+
+      <AccountConfigurator
+        plans={plans}
+        addOns={addOns}
+        defaultPlanKey="SIM_50K"
+        isDemo={config.isDemo}
+      />
+
+      {/* Cross-shopping comes AFTER choosing. Someone who already knows the size
+          they want should not have to scroll past five rows of numbers to pick
+          it; someone comparing can still see every account side by side here. */}
+      <div className="mx-auto max-w-7xl px-4 pb-16">
+        <h2 className="text-2xl mb-4">Compare every account</h2>
         <div className="mt-6 overflow-x-auto">
           <div className="min-w-[60rem]">
             <SpecTable
@@ -138,13 +152,6 @@ export default function AccountsPage() {
           </div>
         )}
       </div>
-
-      <AccountConfigurator
-        plans={plans}
-        addOns={addOns}
-        defaultPlanKey="SIM_50K"
-        isDemo={config.isDemo}
-      />
     </>
   );
 }

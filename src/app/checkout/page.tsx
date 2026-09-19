@@ -7,6 +7,7 @@ import { createQuote, requiredDocuments } from '@/server/services/checkout-servi
 import { isPlanKey } from '@/domain/catalog/plans';
 import { isAddOnKey, type AddOnKey } from '@/domain/catalog/addons';
 import { getConfig } from '@/server/config';
+import { DEFAULT_COUPON } from '@/domain/pricing/coupon';
 import { CheckoutForm, type CheckoutDocument } from '@/components/CheckoutForm';
 import { Callout, SectionHeading } from '@/components/ui';
 import { serialiseMoney } from '@/server/money-mapper';
@@ -54,8 +55,16 @@ export default async function CheckoutPage({
     slug: document.slug,
     title: document.title,
     isDraft: document.status === 'DRAFT_PENDING_LEGAL_REVIEW',
-    excerpt: document.body.slice(0, 1400),
   }));
+
+  // Toggling the coupon re-enters this page with a different query string, so
+  // the discount is re-derived server-side every time rather than trusted from
+  // the browser.
+  const couponApplied = !quote.discountTotal.isZero();
+  const base: string[][] = [['plan', planKey], ...addOnKeys.map((key) => ['addon', key])];
+  const toggleParams = new URLSearchParams(
+    couponApplied ? base : [...base, ['coupon', DEFAULT_COUPON.value.code]],
+  );
 
   const blockedInProduction = quote.productionBlockers.length > 0;
 
@@ -94,18 +103,13 @@ export default async function CheckoutPage({
                 </div>
               ))}
             </div>
-            {couponRejection && (
-              <div className="mt-3">
-                <Callout tone="warn">{couponRejection}</Callout>
-              </div>
-            )}
           </section>
 
           <section>
             <SectionHeading
               number={2}
-              title="Sign the agreements"
-              hint="Read each one, acknowledge it, then sign with your full legal name."
+              title="Agree and sign"
+              hint="One PDF, one signature."
             />
             <CheckoutForm
               quoteId={quoteId}
@@ -114,6 +118,16 @@ export default async function CheckoutPage({
               suggestedName={user.legalName ?? ''}
               totalDisplay={serialiseMoney(quote.total).display}
               isDemo={config.isDemo}
+              coupon={{
+                code: DEFAULT_COUPON.value.code,
+                percentOff: Number(DEFAULT_COUPON.value.percentOff),
+                applied: couponApplied,
+                toggleHref: `/checkout?${toggleParams.toString()}`,
+                savingDisplay: couponApplied
+                  ? serialiseMoney(quote.discountTotal).display
+                  : null,
+                rejection: couponRejection ?? null,
+              }}
             />
           </section>
         </div>

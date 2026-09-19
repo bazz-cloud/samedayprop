@@ -3,10 +3,19 @@
 /**
  * Checkout signature and payment form.
  *
- * Acknowledgements start UNCHECKED — pre-ticking a consent box would make the
- * signature evidence worthless. The signature is an affirmative action: the
- * customer types their full legal name, and the submit button stays disabled
- * until every document is acknowledged and a name is entered.
+ * Two boxes, both unchecked by default — pre-ticking a consent box would make
+ * the signature evidence worthless:
+ *
+ *   1. Agreement. One tick covers every required document, because they are
+ *      served as one PDF with one signature block. The per-document evidence is
+ *      unaffected: the PDF's first page lists each title, version and body hash,
+ *      and the server still writes one acceptance row per document.
+ *   2. Coupon. Applying or removing it re-quotes on the server, so the price is
+ *      never computed in the browser.
+ *
+ * The signature is an affirmative action: the customer types their full legal
+ * name, and submit stays disabled until the agreement is ticked and a name is
+ * entered.
  */
 
 import { useActionState, useState } from 'react';
@@ -19,7 +28,6 @@ export interface CheckoutDocument {
   slug: string;
   title: string;
   isDraft: boolean;
-  excerpt: string;
 }
 
 const INITIAL: CheckoutActionState = { error: null, fieldErrors: {} };
@@ -31,6 +39,7 @@ export function CheckoutForm({
   suggestedName,
   totalDisplay,
   isDemo,
+  coupon,
 }: {
   quoteId: string;
   idempotencyKey: string;
@@ -38,175 +47,208 @@ export function CheckoutForm({
   suggestedName: string;
   totalDisplay: string;
   isDemo: boolean;
+  coupon: {
+    code: string;
+    percentOff: number;
+    applied: boolean;
+    /** Where to go to toggle it. The server re-quotes from this URL. */
+    toggleHref: string;
+    savingDisplay: string | null;
+    rejection: string | null;
+  };
 }) {
   const [state, formAction, pending] = useActionState(completeCheckout, INITIAL);
-  const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
+  const [agreed, setAgreed] = useState(false);
   const [typedName, setTypedName] = useState(suggestedName);
-  const [expanded, setExpanded] = useState<string | null>(null);
 
-  const allAcknowledged = documents.every((d) => acknowledged[d.id]);
-  const canSubmit = allAcknowledged && typedName.trim().length >= 2 && !pending;
+  const canSubmit = agreed && typedName.trim().length >= 2 && !pending;
+  const draftCount = documents.filter((d) => d.isDraft).length;
+  const pdfHref = `/api/checkout/agreement?quoteId=${encodeURIComponent(quoteId)}`;
 
   return (
-    <form action={formAction} className="space-y-6">
-      <input type="hidden" name="quoteId" value={quoteId} />
-      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-
-      {state.error && (
-        <div role="alert">
-          <Callout tone="danger" title="We could not complete your purchase">
-            {state.error}
-          </Callout>
+    <div className="space-y-4">
+      {/* ---- box 2: the coupon ------------------------------------------- */}
+      {/* Its own form: toggling re-quotes on the server via a GET, so the
+          discount can never be decided in the browser. */}
+      <form method="get" action="/checkout" className="rounded-xl border border-border bg-surface p-4">
+        <ToggleFields href={coupon.toggleHref} />
+        <div className="flex items-start gap-3">
+          <input
+            id="applyCoupon"
+            type="checkbox"
+            checked={coupon.applied}
+            onChange={(event) => event.currentTarget.form?.requestSubmit()}
+            className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+          />
+          <div className="min-w-0 flex-1">
+            <label htmlFor="applyCoupon" className="no-caps font-bold cursor-pointer">
+              Apply discount code{' '}
+              <span className={coupon.applied ? 'coupon-chip is-on' : 'coupon-chip'}>
+                {coupon.code}
+              </span>
+            </label>
+            <p className="no-caps text-sm text-fg-muted mt-1">
+              {coupon.applied && coupon.savingDisplay
+                ? `${coupon.percentOff}% off — you save ${coupon.savingDisplay}.`
+                : `${coupon.percentOff}% off your account and every eligible extra.`}
+            </p>
+            {coupon.rejection && (
+              <p className="no-caps text-sm text-fg mt-1">{coupon.rejection}</p>
+            )}
+          </div>
         </div>
-      )}
+      </form>
 
-      <fieldset className="space-y-3">
-        <legend className="font-semibold mb-2">
-          Agreements ({documents.filter((d) => acknowledged[d.id]).length}/{documents.length}{' '}
-          acknowledged)
-        </legend>
+      {/* ---- box 1: the agreement ---------------------------------------- */}
+      <form action={formAction} className="space-y-5">
+        <input type="hidden" name="quoteId" value={quoteId} />
+        <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+        <input type="hidden" name="agreedToAll" value={agreed ? 'on' : ''} />
 
-        {documents.map((document) => (
-          <div key={document.id} className="rounded-lg border border-border bg-surface p-4">
-            <div className="flex items-start gap-3">
-              <input
-                id={`ack_${document.id}`}
-                name={`ack_${document.id}`}
-                type="checkbox"
-                checked={acknowledged[document.id] ?? false}
-                onChange={(event) =>
-                  setAcknowledged((current) => ({
-                    ...current,
-                    [document.id]: event.target.checked,
-                  }))
-                }
-                aria-describedby={`desc_${document.id}`}
-                className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
-              />
-              <div className="min-w-0 flex-1">
-                <label htmlFor={`ack_${document.id}`} className="font-medium cursor-pointer">
-                  {document.title}
-                </label>
-                {document.isDraft && (
-                  <p className="text-xs text-warn mt-1">
-                    Draft pending legal review — not yet approved by a lawyer.
-                  </p>
-                )}
-                <p id={`desc_${document.id}`} className="text-sm text-fg-muted mt-1">
-                  {document.excerpt}
-                </p>
-                <div className="flex gap-3 mt-2 text-sm">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExpanded((current) => (current === document.id ? null : document.id))
-                    }
-                    aria-expanded={expanded === document.id}
-                    className="text-accent hover:underline"
-                  >
-                    {expanded === document.id ? 'Hide full text' : 'Read full text'}
-                  </button>
-                  <Link
-                    href={`/legal/${document.slug}`}
-                    target="_blank"
-                    className="text-fg-subtle hover:text-fg"
-                  >
-                    Open in a new tab
-                  </Link>
-                </div>
-                {expanded === document.id && (
-                  <div className="mt-3 max-h-80 overflow-y-auto rounded border border-border bg-bg p-3">
-                    <pre className="whitespace-pre-wrap font-sans text-xs text-fg-muted leading-relaxed">
-                      {document.excerpt}
-                    </pre>
-                    <p className="text-xs text-fg-subtle mt-3 border-t border-border pt-2">
-                      This is the opening of the document.{' '}
-                      <Link
-                        href={`/legal/${document.slug}`}
-                        target="_blank"
-                        className="text-accent hover:underline"
-                      >
-                        Read the complete text
-                      </Link>
-                      .
-                    </p>
-                  </div>
-                )}
-                {state.fieldErrors[`ack_${document.id}`] && (
-                  <p className="text-sm text-danger mt-2">
-                    {state.fieldErrors[`ack_${document.id}`]}
-                  </p>
-                )}
+        {state.error && (
+          <div role="alert">
+            <Callout tone="danger" title="We could not complete your purchase">
+              {state.error}
+            </Callout>
+          </div>
+        )}
+
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="flex items-start gap-3">
+            <input
+              id="agreedToAll"
+              type="checkbox"
+              checked={agreed}
+              onChange={(event) => setAgreed(event.target.checked)}
+              aria-describedby="agreement-help"
+              className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+            />
+            <div className="min-w-0 flex-1">
+              <label htmlFor="agreedToAll" className="no-caps font-bold cursor-pointer">
+                I have read and agree to the trader agreement and all related terms
+              </label>
+              <p id="agreement-help" className="no-caps text-sm text-fg-muted mt-1">
+                {documents.length} documents in one PDF, each identified by version and hash.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-2 text-sm">
+                <a
+                  href={pdfHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="no-caps text-accent hover:underline font-medium"
+                >
+                  Read the PDF &rarr;
+                </a>
+                <a href={`${pdfHref}&download=1`} download className="no-caps text-fg-subtle hover:text-fg">
+                  Download
+                </a>
               </div>
+              {draftCount > 0 && (
+                <p className="no-caps text-xs text-fg-subtle mt-2">
+                  {draftCount} of these are drafts pending legal review, and are marked as such in
+                  the PDF.
+                </p>
+              )}
+              {state.fieldErrors.agreedToAll && (
+                <p className="no-caps text-sm text-fg font-bold mt-2">
+                  {state.fieldErrors.agreedToAll}
+                </p>
+              )}
             </div>
           </div>
-        ))}
-      </fieldset>
 
-      <div className="rounded-lg border border-border-strong bg-surface-raised p-4">
-        <p className="text-sm text-fg-muted leading-relaxed">{CONSENT_WORDING}</p>
-        <div className="mt-4">
-          <label htmlFor="typedLegalName" className="block text-sm font-medium mb-1">
-            Sign by typing your full legal name
-          </label>
-          <input
-            id="typedLegalName"
-            name="typedLegalName"
-            value={typedName}
-            onChange={(event) => setTypedName(event.target.value)}
-            autoComplete="name"
-            required
-            minLength={2}
-            aria-describedby="signature-help"
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 focus:border-accent"
-          />
-          <p id="signature-help" className="text-xs text-fg-subtle mt-1">
-            We record your typed name, the exact documents and price you agreed to, the time, and
-            limited technical evidence. You can download everything you signed at any time.
-          </p>
-          {state.fieldErrors.typedLegalName && (
-            <p className="text-sm text-danger mt-1">{state.fieldErrors.typedLegalName}</p>
+          {/* The e-signature, at the bottom of what it signs. */}
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="no-caps text-sm text-fg-muted leading-relaxed">{CONSENT_WORDING}</p>
+            <label htmlFor="typedLegalName" className="no-caps block text-sm font-bold mt-3 mb-1">
+              Sign by typing your full legal name
+            </label>
+            <input
+              id="typedLegalName"
+              name="typedLegalName"
+              value={typedName}
+              onChange={(event) => setTypedName(event.target.value)}
+              autoComplete="name"
+              required
+              minLength={2}
+              aria-describedby="signature-help"
+              className="w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-lg focus:border-accent"
+            />
+            <p id="signature-help" className="no-caps text-xs text-fg-subtle mt-1.5">
+              We record your typed name, the exact documents and price you agreed to, the time, and
+              limited technical evidence. You can download everything you signed at any time.
+            </p>
+            {state.fieldErrors.typedLegalName && (
+              <p className="no-caps text-sm text-fg font-bold mt-1">
+                {state.fieldErrors.typedLegalName}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <Callout tone="neutral">
+          Ticking a box and typing your name creates a record of agreement. It does not by itself
+          guarantee that every term is enforceable — that depends on the governing law, which has not
+          yet been decided, and on a legal review that has not yet happened.
+        </Callout>
+
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <h3 className="text-sm">Payment</h3>
+          {isDemo ? (
+            <p className="no-caps text-sm text-fg mt-2 leading-relaxed">
+              Demonstration mode. No payment provider is connected, no card details are collected and
+              no money will move. Submitting records a simulated payment so the rest of the flow can
+              be tested.
+            </p>
+          ) : (
+            <p className="no-caps text-sm text-fg-muted mt-2 leading-relaxed">
+              You will be taken to our payment provider&apos;s hosted page to enter your card
+              details. Card details are never entered on or stored by this site.
+            </p>
           )}
         </div>
-      </div>
 
-      <Callout tone="neutral">
-        Ticking a box and typing your name creates a record of agreement. It does not by itself
-        guarantee that every term is enforceable — that depends on the governing law, which has not
-        yet been decided, and on a legal review that has not yet happened.
-      </Callout>
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="no-caps w-full rounded-lg bg-accent px-4 py-3.5 font-bold text-bg hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {pending ? 'Processing…' : `Sign and pay ${totalDisplay}`}
+        </button>
 
-      <div className="rounded-lg border border-border bg-surface p-4">
-        <h3 className="font-semibold">Payment</h3>
-        {isDemo ? (
-          <p className="text-sm text-warn mt-2 leading-relaxed">
-            Demonstration mode. No payment provider is connected, no card details are collected and
-            no money will move. Submitting records a simulated payment so the rest of the flow can
-            be tested.
-          </p>
-        ) : (
-          <p className="text-sm text-fg-muted mt-2 leading-relaxed">
-            You will be taken to our payment provider&apos;s hosted page to enter your card
-            details. Card details are never entered on or stored by this site.
-          </p>
-        )}
-      </div>
+        <p aria-live="polite" className="no-caps text-xs text-fg-subtle text-center">
+          {!agreed
+            ? 'Tick the agreement to continue.'
+            : typedName.trim().length < 2
+              ? 'Type your full legal name to continue.'
+              : 'One-time charge. Nothing renews automatically.'}
+        </p>
+      </form>
 
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        className="w-full rounded-lg bg-accent px-4 py-3.5 font-semibold text-bg hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
-        {pending ? 'Processing…' : `Sign and pay ${totalDisplay}`}
-      </button>
-
-      <p aria-live="polite" className="text-xs text-fg-subtle text-center">
-        {!allAcknowledged
-          ? 'Acknowledge every agreement to continue.'
-          : typedName.trim().length < 2
-            ? 'Type your full legal name to continue.'
-            : 'One-time charge. Nothing renews automatically.'}
+      <p className="no-caps text-xs text-fg-subtle">
+        Prefer to read them separately? Every document is also on the{' '}
+        <Link href="/legal/trader-agreement" className="text-accent hover:underline">
+          legal pages
+        </Link>
+        .
       </p>
-    </form>
+    </div>
+  );
+}
+
+/**
+ * The coupon toggle target, expressed as hidden fields.
+ *
+ * A GET form serialises its own fields rather than keeping the action's query
+ * string, so the destination has to be rebuilt here.
+ */
+function ToggleFields({ href }: { href: string }) {
+  const params = new URLSearchParams(href.split('?')[1] ?? '');
+  return (
+    <>
+      {[...params.entries()].map(([key, value], index) => (
+        <input key={`${key}-${index}`} type="hidden" name={key} value={value} />
+      ))}
+    </>
   );
 }

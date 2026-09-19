@@ -51,14 +51,25 @@ export async function completeCheckout(
 
   const documents = await requiredDocuments();
 
-  // Each document needs its own unchecked-by-default acknowledgement.
-  const unacknowledged = documents.filter((d) => formData.get(`ack_${d.id}`) !== 'on');
-  if (unacknowledged.length > 0) {
+  // One unchecked-by-default acknowledgement covering every document, because
+  // they are presented as one PDF with one signature block. The per-document
+  // evidence is unchanged: an acceptance row is still written for each one
+  // below, carrying that document's own version and body hash.
+  if (formData.get('agreedToAll') !== 'on') {
     return {
-      error: 'Please acknowledge every agreement before signing.',
-      fieldErrors: Object.fromEntries(
-        unacknowledged.map((d) => [`ack_${d.id}`, 'You must acknowledge this document.']),
-      ),
+      error: 'Please agree to the terms before signing.',
+      fieldErrors: {
+        agreedToAll: 'Tick this to confirm you have read and agree to the documents.',
+      },
+    };
+  }
+
+  if (documents.length === 0) {
+    // Recording a signature against nothing would produce an acceptance that
+    // proves agreement to no terms at all.
+    return {
+      error: 'No agreements are published, so there is nothing to sign yet.',
+      fieldErrors: {},
     };
   }
 
