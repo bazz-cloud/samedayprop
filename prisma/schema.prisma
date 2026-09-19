@@ -533,6 +533,7 @@ model TradingAccount {
   equityCheckpoints EquityCheckpoint[]
   positionSnapshots PositionSnapshot[]
   riskEvents        RiskEvent[]
+  trades            Trade[]
   payoutRequests    PayoutRequest[]
   reservations      PayoutReservation[]
 
@@ -601,6 +602,71 @@ model PositionSnapshot {
   createdAt           DateTime       @default(now())
 
   @@index([tradingAccountId, observedAt])
+}
+
+/// A single position, from the fill that opened it to the fill that closed it.
+///
+/// The risk engine is snapshot-driven: it needs equity, not trades, and it was
+/// built that way deliberately. Trades are recorded ALONGSIDE those snapshots,
+/// never instead of them, for the things a snapshot cannot answer — win rate,
+/// expectancy, hold time, and whether five accounts took the same position in
+/// the same second.
+///
+/// PRICES ARE SCALED INTEGERS, not floats. A futures price has a tick size, and
+/// binary floating point cannot represent 5234.25 exactly; a cent of drift in a
+/// P&L is a payout dispute. `priceE8` is price x 10^8, which is exact for every
+/// tick size in use and leaves room for FX-style precision later.
+///
+/// MONEY IS BigInt MINOR UNITS, as everywhere else in this schema.
+model Trade {
+  id               String         @id @default(cuid())
+  tradingAccountId String
+  tradingAccount   TradingAccount @relation(fields: [tradingAccountId], references: [id])
+
+  symbol           String
+  /// LONG | SHORT. The side of the OPENING fill.
+  side             String
+  /// Contracts. Always positive; direction lives in `side`.
+  quantity         Int
+  /// Micro-equivalent units this position consumed, for exposure reporting.
+  microEquivalents Int
+
+  /// Entry price x 10^8.
+  entryPriceE8 BigInt
+  /// Exit price x 10^8. Null while the position is still open.
+  exitPriceE8  BigInt?
+
+  openedAt DateTime
+  /// Null while open. Duration is derived, never stored.
+  closedAt DateTime?
+
+  /// OPEN | CLOSED
+  status String @default("OPEN")
+
+  /// Realised P&L in minor units, NET of commissions. Zero while open.
+  realisedPnlMinor BigInt @default(0)
+  /// Commissions and fees, already deducted from realisedPnlMinor.
+  commissionMinor  BigInt @default(0)
+
+  /// Session this trade is attributed to, on the same convention the risk
+  /// engine uses: the calendar date the session CLOSES.
+  sessionDate String
+
+  /// Provider's monotonic sequence for the closing fill, so a replayed event
+  /// cannot record the same trade twice.
+  provider        String @default("tradovate")
+  providerTradeId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The duplicate guard. A provider redelivering a fill must not double-count.
+  @@unique([provider, providerTradeId])
+  @@index([tradingAccountId, openedAt])
+  @@index([tradingAccountId, status])
+  @@index([tradingAccountId, sessionDate])
+  /// Correlation detection scans by symbol and open time across accounts.
+  @@index([symbol, openedAt])
 }
 
 model RiskEvent {
