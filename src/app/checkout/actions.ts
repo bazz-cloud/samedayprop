@@ -25,6 +25,7 @@ import {
 import { getPaymentProvider } from '@/server/providers/registry';
 import { Money } from '@/domain/money/money';
 import { getConfig } from '@/server/config';
+import { DEFAULT_PLATFORM, isPlatformKey, type PlatformKey } from '@/domain/catalog/platforms';
 import { CONSENT_WORDING } from './consent';
 
 export interface CheckoutActionState {
@@ -105,9 +106,17 @@ export async function completeCheckout(
     return { error: 'Some agreements are still outstanding.', fieldErrors: {} };
   }
 
+  // The platform choice travels with the signature, so the record of what was
+  // agreed includes which platform it was agreed for. An unrecognised value
+  // falls back to the default rather than throwing: it can only come from a
+  // tampered form, and the default is the one this application can actually
+  // provision on.
+  const rawPlatform = String(formData.get('platform') ?? '');
+  const platform: PlatformKey = isPlatformKey(rawPlatform) ? rawPlatform : DEFAULT_PLATFORM;
+
   let orderId: string;
   try {
-    const order = await createOrder({ userId: user.id, quoteId, idempotencyKey });
+    const order = await createOrder({ userId: user.id, quoteId, platform, idempotencyKey });
     orderId = order.orderId;
   } catch (error) {
     if (error instanceof CheckoutError) return { error: error.message, fieldErrors: {} };

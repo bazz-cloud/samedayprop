@@ -35,6 +35,7 @@ import {
 import { DEFAULT_SESSION_CONFIG, nextMarketOpen, sessionDateFor } from '@/domain/risk/session';
 import { computeExposure, ceilingToMicroEquivalents, type ProductSpec } from '@/domain/risk/exposure';
 import { effectiveRules, toRuleSnapshot } from './catalog-service';
+import { DEFAULT_PLATFORM, isPlatformKey } from '@/domain/catalog/platforms';
 import { getTradingProvider } from '@/server/providers/registry';
 import type { AccountSnapshot } from '@/server/providers/trading/types';
 
@@ -374,7 +375,7 @@ async function enforceBreach(
   });
   if (existing) return;
 
-  const provider = getTradingProvider();
+  const provider = providerFor(account);
   // A daily-loss lockout runs to the next Globex reopen, which is an hour
   // after the session roll that refreshes the allowance.
   const lockedOutUntil =
@@ -500,7 +501,7 @@ export async function syncAccount(tradingAccountId: string): Promise<RiskAssessm
   const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: tradingAccountId } });
   if (!account.externalAccountId) return null;
 
-  const provider = getTradingProvider();
+  const provider = providerFor(account);
   try {
     const snapshot = await provider.fetchAccountSnapshot(account.externalAccountId);
     return await ingestSnapshot(tradingAccountId, snapshot);
@@ -515,4 +516,15 @@ export async function syncAccount(tradingAccountId: string): Promise<RiskAssessm
     });
     return null;
   }
+}
+
+/**
+ * The adapter for the platform an account actually lives on.
+ *
+ * Every provider call in this file goes through here rather than the default,
+ * because an account on Rithmic and an account on Tradovate are reached by
+ * different adapters and acting on the wrong one is worse than not acting.
+ */
+function providerFor(account: { platform: string }) {
+  return getTradingProvider(isPlatformKey(account.platform) ? account.platform : DEFAULT_PLATFORM);
 }

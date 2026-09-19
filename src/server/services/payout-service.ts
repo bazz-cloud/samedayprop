@@ -38,6 +38,7 @@ import {
 import { DEFAULT_SESSION_CONFIG, lockoutHasLifted, sessionDateFor } from '@/domain/risk/session';
 import { buildObligationEntry, buildPayoutEntries } from '@/domain/ledger/entries';
 import { effectiveRules, lifetimeCapForPayout, toRuleSnapshot } from './catalog-service';
+import { DEFAULT_PLATFORM, isPlatformKey } from '@/domain/catalog/platforms';
 import { checkPayoutProfile } from '@/domain/customer/profile';
 import { checkLifetimeCapReached } from '@/domain/analytics/exposure';
 import { postEntries, postEntry } from './ledger-service';
@@ -438,7 +439,7 @@ export async function submitPayout(payoutRequestId: string): Promise<PayoutState
 
   const gross = Money.fromMinor(request.grossMinor);
   const cash = Money.fromMinor(request.cashMinor);
-  const provider = getTradingProvider();
+  const provider = providerFor(request.tradingAccount);
 
   // ---- 1. simulated deduction ---------------------------------------------
   let deduction;
@@ -736,7 +737,7 @@ export async function resolveReconciliation(input: {
     input.actor,
   );
 
-  const provider = getTradingProvider();
+  const provider = providerFor(request.tradingAccount);
   const gross = Money.fromMinor(request.grossMinor);
 
   // Restore the simulated balance, now that non-payment is confirmed.
@@ -774,4 +775,15 @@ export async function resolveReconciliation(input: {
   });
 
   return 'failed';
+}
+
+/**
+ * The adapter for the platform an account actually lives on.
+ *
+ * Every provider call in this file goes through here rather than the default,
+ * because an account on Rithmic and an account on Tradovate are reached by
+ * different adapters and acting on the wrong one is worse than not acting.
+ */
+function providerFor(account: { platform: string }) {
+  return getTradingProvider(isPlatformKey(account.platform) ? account.platform : DEFAULT_PLATFORM);
 }

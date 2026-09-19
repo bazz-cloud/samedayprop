@@ -17,6 +17,7 @@
 import { prisma } from '@/server/db';
 import { Money } from '@/domain/money/money';
 import { getPlan, trailingStopFor, type PlanKey } from '@/domain/catalog/plans';
+import { DEFAULT_PLATFORM, isPlatformKey } from '@/domain/catalog/platforms';
 import {
   checkResetEligibility,
   computeResetState,
@@ -150,7 +151,7 @@ export async function applyReset(input: {
 
   // Tell the provider first: if the simulated balance cannot be moved there,
   // our records must not claim it was.
-  const provider = getTradingProvider();
+  const provider = providerFor(account);
   if (account.externalAccountId && !delta.isZero()) {
     const result = await provider.adjustSimBalance(
       account.externalAccountId,
@@ -257,4 +258,15 @@ export async function applyReset(input: {
 /** Whether an account is currently blocked by a daily-loss lockout. */
 export function accountIsLockedOut(account: { lockedOutUntil: Date | null }): boolean {
   return !lockoutHasLifted(account.lockedOutUntil, new Date());
+}
+
+/**
+ * The adapter for the platform an account actually lives on.
+ *
+ * Every provider call in this file goes through here rather than the default,
+ * because an account on Rithmic and an account on Tradovate are reached by
+ * different adapters and acting on the wrong one is worse than not acting.
+ */
+function providerFor(account: { platform: string }) {
+  return getTradingProvider(isPlatformKey(account.platform) ? account.platform : DEFAULT_PLATFORM);
 }

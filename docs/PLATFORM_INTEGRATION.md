@@ -1,0 +1,113 @@
+# Connecting Tradovate and Rithmic
+
+Researched 2026-09-19. Sources at the foot. **Nothing here has been tested
+against either vendor** — no credentials were held, no call was made, and the
+vendors' own documentation sites were not reachable from the build environment.
+What follows comes from search results and secondary sources, so treat every
+endpoint name as a lead to verify rather than a fact to code against.
+
+The short version: **they are not two versions of the same thing.** Tradovate is
+a REST partner API built for exactly this use case. Rithmic is native-library
+routing infrastructure that does not open accounts at all. The work, the cost
+and the timeline are different by an order of magnitude.
+
+---
+
+## Tradovate — the practical path
+
+Tradovate publishes a **Partner API** aimed at prop firms, at
+`partner.tradovate.com`. The shape reported by its documentation:
+
+| Step | What is reported |
+|---|---|
+| Register | Register as a partner; Tradovate issues an **API key**. |
+| Authenticate | Exchange the key for an access token, sent as a bearer token. Tokens expire after **90 minutes**; cache and refresh at ~85. |
+| Conformance | A staged conformance process, beginning with authentication. |
+| Go live | A separate **production API key**, to be beta tested for **at least a week** before real traffic. |
+| Create traders | Create users individually or in bulk; `/user/createEvaluationAccounts` is reported to create accounts and assign them to users by id. Batched endpoints are preferred over per-user calls. |
+| Entitlements | `addEntitlementSubscription` assigns the T-Prop entitlement — **only after the user has signed Tradovate's non-professional Market Data Agreement**. |
+
+### What that means for us
+
+- The credential flow in this codebase already assumes **show-once** delivery
+  and never a reusable emailed password. Confirm what Tradovate actually
+  returns — an invitation, a token, or a password — and keep the
+  `accessDelivery` union honest about it.
+- **The market data agreement is a second signature, with Tradovate, not us.**
+  Our checkout collects one signature for our own documents. Where the trader
+  signs Tradovate's agreement, and what the account looks like between purchase
+  and that signature, is an unanswered product question. It is the single most
+  likely cause of a stuck "paid but not tradeable" account.
+- Every capability in `src/server/providers/trading/tradovate.ts` stays
+  `UNVERIFIED` until a real call is made against a real key. The adapter throws
+  rather than returning a plausible success.
+
+## Rithmic — a different kind of project
+
+Two facts decide this, and neither is about access:
+
+1. **Rithmic does not issue trader accounts.** It is broker- and FCM-neutral
+   infrastructure. The broker, FCM or funding evaluator opens the account and
+   issues the credentials. So "check out, get a Rithmic sign-in" requires a
+   third party in the middle who is not Rithmic.
+2. **R | API+ is a C++ and .NET library, not a REST API.** It cannot be called
+   from this Node application at all. Reaching it means building a separate
+   service in a supported language that speaks R | API+ and exposes an internal
+   interface — that service is the adapter, not a file in this repository.
+
+The reported process: contact Rithmic with company details and the API flavours
+needed, receive the dev kit, build against **Rithmic Test** (no conformance
+needed to connect), then submit for **conformance** before any production or
+paper connection. Live credentials come from the FCM or broker afterwards.
+
+`src/server/providers/trading/rithmic.ts` therefore marks
+`provisionSimulatedAccount`, `secureCredentialDelivery`, `createCustomerIdentity`
+and `adjustSimBalance` as **UNSUPPORTED** rather than UNVERIFIED. They are not
+one contract away.
+
+### If you want Rithmic sooner
+
+There are middleware vendors selling Rithmic integration to prop firms. That
+swaps a build for a dependency and a revenue share, and it puts a third party
+between you and the risk engine that decides whether an account is breached.
+Worth pricing, worth being deliberate about.
+
+---
+
+## What is built already
+
+- The customer **chooses a platform at checkout**, inside the signed form, so
+  the record of what was agreed says which platform it was agreed for.
+- The choice is stored on the **order** and on the **trading account**, and
+  frozen into the order's terms snapshot.
+- `getTradingProvider(platform)` returns the adapter for that platform, and
+  every provider call that acts on an account routes through the account's own
+  platform. Acting on the wrong adapter is worse than not acting.
+- In production, `createOrder` refuses any order while `PLATFORMS` is EXTERNAL,
+  naming what is outstanding for the platform chosen.
+- In demo mode both platforms resolve to the mock provider, which issues
+  show-once demo credentials. That is a demonstration of the flow, not evidence
+  either integration works.
+
+## What is NOT built, and must not be faked
+
+- No call to either vendor.
+- No credential issuance that would survive contact with a real platform.
+- No claim on the public site that either platform is connected. `/platform`
+  says Tradovate is planned and unverified; keep it that way until a real
+  account has been created through a real key.
+
+---
+
+## Sources
+
+- https://partner.tradovate.com/ — Tradovate Partner API introduction
+- https://partner.tradovate.com/overview/prop-firm-management/create-and-manage-users
+- https://partner.tradovate.com/overview/quick-setup/auth-overview
+- https://partner.tradovate.com/overview/conformance-testing/stage-1-authentication
+- https://support.tradovate.com/s/article/Tradovate-API-Access
+- https://prop.tradovate.com/ — Tradovate for prop firms
+- https://www.rithmic.com/products/api-suite — R | API+
+- https://www.rithmic.com/products/r-trader-pro
+- https://www.quantlabsnet.com/post/what-is-a-rithmic-api-conformance-test
+- https://github.com/nautechsystems/nautilus_trader/issues/3768 — R-protocol adapter discussion

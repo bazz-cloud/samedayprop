@@ -25,6 +25,15 @@ import { completeCheckout, type CheckoutActionState } from '@/app/checkout/actio
 import { CONSENT_WORDING } from '@/app/checkout/consent';
 import { Callout } from './ui';
 
+export interface CheckoutPlatform {
+  key: string;
+  name: string;
+  summary: string;
+  note: string;
+  /** False when this application cannot provision on it by itself. */
+  reachable: boolean;
+}
+
 export interface CheckoutDocument {
   id: string;
   slug: string;
@@ -38,6 +47,8 @@ export function CheckoutForm({
   quoteId,
   idempotencyKey,
   documents,
+  platforms,
+  defaultPlatform,
   suggestedName,
   totalDisplay,
   isDemo,
@@ -45,12 +56,15 @@ export function CheckoutForm({
   quoteId: string;
   idempotencyKey: string;
   documents: CheckoutDocument[];
+  platforms: CheckoutPlatform[];
+  defaultPlatform: string;
   suggestedName: string;
   totalDisplay: string;
   isDemo: boolean;
 }) {
   const [state, formAction, pending] = useActionState(completeCheckout, INITIAL);
   const [agreed, setAgreed] = useState(false);
+  const [platform, setPlatform] = useState(defaultPlatform);
   const [typedName, setTypedName] = useState(suggestedName);
 
   const canSubmit = agreed && typedName.trim().length >= 2 && !pending;
@@ -63,6 +77,52 @@ export function CheckoutForm({
         <input type="hidden" name="quoteId" value={quoteId} />
         <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
         <input type="hidden" name="agreedToAll" value={agreed ? 'on' : ''} />
+        <input type="hidden" name="platform" value={platform} />
+
+        {/* The platform choice sits INSIDE the signed form, so the record of
+            what was agreed includes which platform it was agreed for. It is
+            also above the signature rather than below it, because it is part of
+            the thing being signed. */}
+        <fieldset className="rounded-xl border border-border bg-surface p-4">
+          <legend className="label px-1">Trading platform</legend>
+          <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
+            {platforms.map((option) => {
+              const selected = option.key === platform;
+              return (
+                <label
+                  key={option.key}
+                  className={`block cursor-pointer rounded-lg border p-3.5 transition-colors ${
+                    selected
+                      ? 'border-accent bg-card-accent'
+                      : 'border-border bg-card hover:border-border-bold'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <input
+                      type="radio"
+                      name="platformChoice"
+                      value={option.key}
+                      checked={selected}
+                      onChange={() => setPlatform(option.key)}
+                      className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+                    />
+                    <div className="min-w-0">
+                      <span className="no-caps font-bold">{option.name}</span>
+                      <p className="no-caps mt-0.5 text-xs text-fg-muted leading-relaxed">
+                        {option.summary}
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+          {/* The chosen platform's caveat, always visible rather than on hover:
+              this choice is made once and is awkward to undo. */}
+          <p className="no-caps mt-3 text-xs text-fg-subtle leading-relaxed">
+            {platforms.find((option) => option.key === platform)?.note}
+          </p>
+        </fieldset>
 
         {state.error && (
           <div role="alert">

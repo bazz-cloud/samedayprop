@@ -13,6 +13,7 @@ import {
   type AddOnKey,
 } from '@/domain/catalog/addons';
 import { getConfig } from '@/server/config';
+import { DEFAULT_PLATFORM, PLATFORMS } from '@/domain/catalog/platforms';
 import { DEFAULT_COUPON } from '@/domain/pricing/coupon';
 import { getPlanViews } from '@/server/views/catalog-view';
 import { CheckoutForm, type CheckoutDocument } from '@/components/CheckoutForm';
@@ -244,6 +245,14 @@ export default async function CheckoutPage({
               quoteId={quoteId}
               idempotencyKey={randomUUID()}
               documents={checkoutDocuments}
+              platforms={PLATFORMS.value.map((platform) => ({
+                key: platform.key,
+                name: platform.name,
+                summary: platform.summary,
+                note: platform.note,
+                reachable: platform.reachableFromThisApp,
+              }))}
+              defaultPlatform={DEFAULT_PLATFORM}
               suggestedName={user.legalName ?? ''}
               totalDisplay={serialiseMoney(quote.total).display}
               isDemo={config.isDemo}

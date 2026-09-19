@@ -39,8 +39,9 @@ commercial decision, or a credential I must never hold.
 
 | Item | Notes |
 |---|---|
-| **Tradovate partner agreement** | Every capability is UNVERIFIED: creating accounts, applying and reading back risk limits, streaming authoritative equity, stopping trading on breach. See `docs/TRADOVATE_CAPABILITIES.md`. |
-| **Rithmic** | Second platform, not yet scoped. Decide whether it is an alternative or a parallel offering — it changes the provisioning layer, the credential flow and the risk-ingest adapter, not just a dropdown. |
+| **Tradovate partner agreement** | Researched 2026-09-19 — see `docs/PLATFORM_INTEGRATION.md`. Register as a partner for an API key, pass conformance, beta test the production key a week. Every capability stays UNVERIFIED until a real call is made. **Open product question:** Tradovate needs the trader to sign ITS market data agreement before the account can be entitled, and our checkout has no step for that. |
+| **Rithmic** | Bigger than a dropdown, and the research says why. Rithmic does not open accounts — a broker or FCM does, and issues the credentials. R \| API+ is a C++/.NET library, so it cannot be called from this app at all; it needs a separate service in a supported language, plus an FCM relationship and passed conformance. Marked UNSUPPORTED, not UNVERIFIED, for account creation. |
+| **Which platform to launch with** | Tradovate is weeks of integration. Rithmic is a separate service and an FCM. Launching Tradovate-only and adding Rithmic later is the cheaper order, and the checkout already stores the choice per order either way. |
 | **Automated credential issuance** | Depends on the platform partner. The show-once password mechanism is built; what is missing is the provider call that creates the account and returns an invitation. |
 | **Which fills the provider sends** | The `Trade` model exists but nothing populates it from a real provider yet. The risk engine is snapshot-driven; trades need a fills feed. Without it the admin analytics run on seeded fixtures only. |
 

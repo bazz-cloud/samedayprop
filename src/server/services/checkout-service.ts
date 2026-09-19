@@ -28,6 +28,12 @@ import {
   type CouponDefinition,
 } from '@/domain/pricing/coupon';
 import { getAddOn, isAddOnKey, type AddOnKey } from '@/domain/catalog/addons';
+import {
+  DEFAULT_PLATFORM,
+  PLATFORMS,
+  getPlatform,
+  type PlatformKey,
+} from '@/domain/catalog/platforms';
 import { isPlanKey, type PlanKey } from '@/domain/catalog/plans';
 import { getPublishedPlanVersion } from './catalog-service';
 import { buildPurchaseEntries } from '@/domain/ledger/entries';
@@ -332,6 +338,12 @@ export class CheckoutError extends Error {
 export interface CreateOrderInput {
   readonly userId: string;
   readonly quoteId: string;
+  /**
+   * The trading platform chosen at checkout. Part of what was bought, so it is
+   * stored on the order and frozen into the terms snapshot rather than being
+   * read from the catalog later.
+   */
+  readonly platform?: PlatformKey;
   /** Client-supplied, so a double submit creates exactly one order. */
   readonly idempotencyKey: string;
 }
@@ -358,6 +370,20 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     throw new CheckoutError('QUOTE_STALE', revalidated.reason ?? 'That quote is no longer valid.');
   }
   const quote = revalidated.quote;
+
+  // The platform is a production blocker in its own right, and it is not
+  // visible on the quote because it is chosen on the signature form rather
+  // than priced. Selling an account bound to a platform this system cannot
+  // provision on would take money for something that cannot be delivered.
+  const chosenPlatform = input.platform ?? DEFAULT_PLATFORM;
+  if (config.mode === 'PRODUCTION' && PLATFORMS.status !== 'CONFIRMED') {
+    const platform = getPlatform(chosenPlatform);
+    throw new CheckoutError(
+      'PLATFORM_NOT_READY',
+      `${platform.name} is not connected yet, so this account cannot be sold. ` +
+        `Outstanding: ${platform.outstanding.join(' ')}`,
+    );
+  }
 
   if (config.mode === 'PRODUCTION' && quote.productionBlockers.length > 0) {
     throw new CheckoutError(
@@ -436,6 +462,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         userId: input.userId,
         quoteId: input.quoteId,
         planVersionId: planVersion.id,
+        platform: input.platform ?? DEFAULT_PLATFORM,
         status: 'PENDING_PAYMENT',
         subtotalMinor: quote.subtotal.minor,
         discountMinor: quote.discountTotal.minor,
@@ -447,6 +474,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
           planVersionId: planVersion.id,
           planKey: planVersion.planKey,
           planVersion: planVersion.version,
+          platform: input.platform ?? DEFAULT_PLATFORM,
           rules: {
             startingBalanceMinor: planVersion.startingBalanceMinor.toString(),
             drawdownAllowanceMinor: planVersion.drawdownAllowanceMinor.toString(),

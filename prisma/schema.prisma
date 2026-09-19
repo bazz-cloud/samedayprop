@@ -364,6 +364,10 @@ model Order {
   termsSnapshot String
   termsHash     String
 
+  /// Trading platform the customer chose at checkout: TRADOVATE | RITHMIC.
+  /// Snapshotted on the order because it is part of what was bought.
+  platform       String @default("TRADOVATE")
+
   /// Client-supplied key making order creation safe under retries.
   idempotencyKey String @unique
 
@@ -496,6 +500,8 @@ model TradingAccount {
   /// External identifier at the trading provider. Unique so a retried
   /// provisioning call cannot attach two accounts to one order.
   externalAccountId String? @unique
+  /// The platform this account lives on, carried from the order.
+  platform          String  @default("TRADOVATE")
   providerName      String  @default("tradovate")
   providerMode      String  @default("MOCK") // MOCK | SANDBOX | PRODUCTION
 

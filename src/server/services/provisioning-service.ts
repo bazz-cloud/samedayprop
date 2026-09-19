@@ -16,6 +16,7 @@ import type { Prisma } from '@/generated/prisma';
 import { prisma } from '@/server/db';
 import { Money } from '@/domain/money/money';
 import { isAddOnKey, riskDeltasFor, type AddOnKey } from '@/domain/catalog/addons';
+import { DEFAULT_PLATFORM, isPlatformKey } from '@/domain/catalog/platforms';
 import { ceilingToMicroEquivalents } from '@/domain/risk/exposure';
 import {
   assertTransition,
@@ -72,7 +73,11 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
     };
   }
 
-  const provider = getTradingProvider();
+  // The platform the customer chose and signed for, not a global default: the
+  // two adapters are not interchangeable, and picking the wrong one would
+  // provision on a platform nobody agreed to.
+  const platform = isPlatformKey(order.platform) ? order.platform : DEFAULT_PLATFORM;
+  const provider = getTradingProvider(platform);
   const baseRules = toRuleSnapshot(order.planVersion);
 
   // Risk add-ons bought on this order. Read from the ORDER, which is the record
@@ -133,6 +138,7 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
           orderId,
           planVersionId: order.planVersionId,
           externalAccountId: result.externalAccountId,
+          platform,
           providerName: provider.name,
           providerMode: provider.mode,
           provisioningState: 'provisioned_unverified',
