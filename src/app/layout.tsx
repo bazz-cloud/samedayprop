@@ -55,6 +55,23 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en">
+      <head>
+        {/*
+          Satoshi, from the foundry's own CDN.
+          Preconnect first so the font request does not wait on a fresh TLS
+          handshake; `display=swap` means text paints in the fallback
+          immediately rather than sitting invisible while the font arrives.
+          Weights: 400 for body, 500 for the few medium labels, 700 for every
+          heading, subheading and table title. 401 and 701 are Fontshare's
+          numbering for the italics of those weights, needed by the wordmark.
+        */}
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f%5B%5D=satoshi@400,401,500,700,701&display=swap"
+        />
+      </head>
       <body className="min-h-screen flex flex-col">
         <a
           href="#main"

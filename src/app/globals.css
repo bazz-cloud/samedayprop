@@ -57,23 +57,49 @@
   --color-surface-raised: #0d0f0d;
 
   /*
-   * Arial for everything that is words.
+   * Satoshi, for every word and every number on the site.
    *
-   * Headings are Arial BOLD — the same family at weight 700 — not Arial Black,
-   * which is a separate and much heavier face. Display and body therefore share
-   * one stack, and the difference between them is weight and case, not family.
+   * One family throughout: body is Satoshi Regular in sentence case, and
+   * headings, subheadings and table titles are the SAME family at weight 700 in
+   * capitals. The difference between them is weight and case, never family.
+   *
+   * Arial stays in the stack as the fallback, because it is metrically close
+   * enough that a failed font load reflows rather than rearranging the page.
    */
-  --font-sans: Arial, Helvetica, 'Liberation Sans', sans-serif;
-  --font-display: Arial, Helvetica, 'Liberation Sans', sans-serif;
+  --font-sans: 'Satoshi', Arial, Helvetica, 'Liberation Sans', sans-serif;
+  --font-display: 'Satoshi', Arial, Helvetica, 'Liberation Sans', sans-serif;
   /*
-   * Every numeral on the site. Tabular figures are what make a column of
-   * prices line up, which is the single biggest readability win available on a
-   * page that is mostly money. No webfont is loaded for it: ui-monospace is
-   * already an excellent tabular face on every current platform, and a network
-   * round trip to render a balance is a poor trade.
+   * Numerals are Satoshi too, with tabular figures switched on.
+   *
+   * Tabular figures are what make a column of prices line up, which is the
+   * single biggest readability win available on a page that is mostly money.
+   * This used to be a monospace face; it is now the same family as everything
+   * else, with the OpenType `tnum` feature doing the alignment instead.
    */
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-mono: 'Satoshi', Arial, Helvetica, 'Liberation Sans', sans-serif;
 }
+
+/*
+ * Satoshi.
+ *
+ * Loaded from Fontshare's CDN, which is the foundry's own. The stylesheet is
+ * linked from the document head rather than @import-ed here, because an @import
+ * inside a bundled stylesheet serialises the download behind our own CSS.
+ *
+ * TO SELF-HOST INSTEAD — which is faster and removes the only third-party
+ * origin on the site — download the family from fontshare.com, put the woff2
+ * files in public/fonts/, uncomment the @font-face rules below, delete the
+ * <link> tags in src/app/layout.tsx, and remove the two fontshare entries from
+ * the CSP in src/middleware.ts. Keep the licence file with the fonts.
+ *
+ * @font-face {
+ *   font-family: 'Satoshi';
+ *   src: url('/fonts/Satoshi-Variable.woff2') format('woff2-variations');
+ *   font-weight: 300 900;
+ *   font-style: normal;
+ *   font-display: swap;
+ * }
+ */
 
 html {
   color-scheme: dark;
@@ -88,15 +114,32 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Every figure on the site, in one rule.
+ *
+ * `tabular-nums` makes each digit occupy the same advance width, so a column of
+ * prices aligns on the decimal point. `slashed-zero` distinguishes 0 from O in
+ * an account reference. Both are OpenType features Satoshi carries; where a
+ * fallback face does not, they are simply ignored rather than breaking.
+ */
+.tnum,
+th,
+td,
+input,
+output {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: 'tnum' 1, 'zero' 1;
+}
+
 /* Prose sets ragged rather than with orphans, and stops short of a line length
    that becomes hard to track back from. */
 p {
   text-wrap: pretty;
 }
 
-/* Headings and subheadings: Arial Bold, uppercase.
+/* Headings, subheadings and table titles: Satoshi Bold, uppercase.
    Caps need POSITIVE tracking — at the negative tracking that suits mixed-case
-   Arial, capitals jam into each other and stop being readable. */
+   text, capitals jam into each other and stop being readable. */
 h1,
 h2,
 h3,
@@ -115,7 +158,7 @@ h4,
   letter-spacing: -0.01em;
 }
 
-/* The wordmark's own treatment: Arial Bold, italic. Used sparingly. */
+/* The wordmark's own treatment: Satoshi Bold, italic. Used sparingly. */
 .wordmark {
   font-family: var(--font-display);
   font-style: italic;
@@ -255,23 +298,27 @@ h4,
 
 /*
  * Numerals. Applied to every price, balance, limit, P&L and percentage.
- * Monospace plus tabular figures so digits occupy identical width and columns
- * of figures align down the page.
+ *
+ * Same family as the prose now, not a monospace face. The alignment comes from
+ * the tabular-figures rule near the top of this file rather than from the
+ * typeface, which is what lets one family carry both the words and the numbers.
  */
 .tnum {
   font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
 /*
- * Table column headers.
+ * Table titles and column headers: the same Bold + capitals as a heading.
  *
  * One rule rather than a .toUpperCase() at each call site, which is how two of
  * them came to be missed. Scoped to `col` deliberately: a row header is a value
  * — an account size, a symbol, a date — and uppercasing those would mangle them.
  */
+caption,
 th[scope='col'] {
+  font-family: var(--font-display);
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }

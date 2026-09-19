@@ -154,14 +154,20 @@ function unlockPage(nextPath: string, failed: boolean): Response {
  * `style-src` keeps 'unsafe-inline'. Styles cannot currently be nonced through
  * Next's style pipeline, and an injected stylesheet is a far smaller problem
  * than injected script.
+ *
+ * Fontshare is the ONE third-party origin allowed, and only for the typeface:
+ * the stylesheet comes from api.fontshare.com and the font files from
+ * cdn.fontshare.com. It is not in `connect-src`, so no script can use it as a
+ * data channel. Drop self-hosted woff2 files into public/fonts and both entries
+ * can come straight back out — see the @font-face block in globals.css.
  */
 function contentSecurityPolicy(nonce: string, isDev: boolean): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''}`.trim(),
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://api.fontshare.com",
     "img-src 'self' data: blob:",
-    "font-src 'self' data:",
+    "font-src 'self' data: https://cdn.fontshare.com",
     // No third-party calls are made from the browser. If a payment provider's
     // hosted fields are added later, its origin goes here and nowhere else.
     "connect-src 'self'",
