@@ -20,7 +20,7 @@ import {
   type PlanDefinition,
   type PlanKey,
 } from '@/domain/catalog/plans';
-import { ADDONS } from '@/domain/catalog/addons';
+import { ADDONS, applyRiskDeltas } from '@/domain/catalog/addons';
 import { lifetimeCapBlocksProductionSale } from '@/domain/config/requirement-status';
 
 function requirementStatusMap(plan: PlanDefinition): Record<string, string> {
@@ -123,6 +123,15 @@ export async function publishCatalogIfEmpty(): Promise<{ plans: number; addons: 
     plans += 1;
   }
 
+  // A withdrawn product does not just stop being offered — its published row is
+  // retired, so nothing can quote a price for something no longer in the
+  // catalog. The three candidate add-ons replaced by the risk upgrades go this
+  // way on the next publish.
+  await prisma.addOnVersion.updateMany({
+    where: { status: 'PUBLISHED', addOnKey: { notIn: ADDONS.map((addon) => addon.key) } },
+    data: { status: 'RETIRED' },
+  });
+
   for (const addon of ADDONS) {
     const existing = await prisma.addOnVersion.findFirst({
       where: { addOnKey: addon.key, status: 'PUBLISHED' },
@@ -135,17 +144,29 @@ export async function publishCatalogIfEmpty(): Promise<{ plans: number; addons: 
         version: 1,
         name: addon.name,
         description: addon.description,
-        listPriceMinor: addon.listPrice.value.minor,
+        limitation: addon.limitation,
+        listPricesJson: JSON.stringify(
+          Object.fromEntries(
+            Object.entries(addon.listPriceByPlan.value).map(([key, price]) => [
+              key,
+              price.minor.toString(),
+            ]),
+          ),
+        ),
         deliveryKind: addon.delivery.kind,
         deliveryDays: addon.delivery.kind === 'timed-entitlement' ? addon.delivery.days : null,
         deliveryMinutes:
           addon.delivery.kind === 'scheduled-session' ? addon.delivery.minutes : null,
-        assumedUnitCostMinor: addon.assumedUnitCost.value.minor,
+        effectKind: addon.effect.kind,
+        effectValue:
+          addon.effect.kind === 'daily-loss-uplift'
+            ? Number(addon.effect.percentOfBase)
+            : addon.effect.extraMinis,
+        assumedUnitCostMinor: null,
         requiresCapacityCheck: addon.requiresCapacityCheck,
         couponEligible: addon.couponEligible,
         status: 'PUBLISHED',
-        // Every add-on is a candidate product; none is approved for sale.
-        sellableInProduction: addon.listPrice.status === 'CONFIRMED',
+        sellableInProduction: addon.listPriceByPlan.status === 'CONFIRMED',
       },
     });
     addons += 1;
@@ -310,6 +331,35 @@ export interface PlanRuleSnapshot {
   readonly lifetimeCap: Money | null;
   readonly requirementStatuses: Record<string, string>;
   readonly launchBlockers: { field: string; status: string; detail: string }[];
+}
+
+/**
+ * Base plan rules plus whatever risk add-ons the customer bought.
+ *
+ * The ONLY place effective limits are assembled. Every consumer — the risk
+ * engine, provisioning's call to the provider, the dashboard — goes through
+ * here, so a purchased uplift cannot be honoured in one place and ignored in
+ * another. The deltas come off the trading account, where they were snapshotted
+ * at provisioning, not from the live catalog: repricing or withdrawing an
+ * add-on must not change the limits on an account already sold.
+ */
+export function effectiveRules(
+  rules: PlanRuleSnapshot,
+  account: { addOnDailyLossUpliftPercent: number; addOnExtraMinis: number },
+): PlanRuleSnapshot {
+  if (account.addOnDailyLossUpliftPercent === 0 && account.addOnExtraMinis === 0) return rules;
+  const applied = applyRiskDeltas(
+    {
+      dailyLossLimit: rules.dailyLossLimit,
+      ceilingMinis: rules.ceilingMinis,
+      ceilingMicros: rules.ceilingMicros,
+    },
+    {
+      dailyLossUpliftPercent: BigInt(account.addOnDailyLossUpliftPercent),
+      extraMinis: account.addOnExtraMinis,
+    },
+  );
+  return { ...rules, ...applied };
 }
 
 /** Read a stored version back into domain types. */

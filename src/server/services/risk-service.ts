@@ -34,7 +34,7 @@ import {
 } from '@/domain/risk/daily-loss';
 import { DEFAULT_SESSION_CONFIG, nextMarketOpen, sessionDateFor } from '@/domain/risk/session';
 import { computeExposure, ceilingToMicroEquivalents, type ProductSpec } from '@/domain/risk/exposure';
-import { toRuleSnapshot } from './catalog-service';
+import { effectiveRules, toRuleSnapshot } from './catalog-service';
 import { getTradingProvider } from '@/server/providers/registry';
 import type { AccountSnapshot } from '@/server/providers/trading/types';
 
@@ -89,7 +89,9 @@ export async function ingestSnapshot(
     where: { id: tradingAccountId },
     include: { planVersion: true },
   });
-  const rules = toRuleSnapshot(account.planVersion);
+  // Effective, not base: an account that bought a bigger daily loss limit is
+  // enforced against the limit it paid for, or the receipt is a lie.
+  const rules = effectiveRules(toRuleSnapshot(account.planVersion), account);
   const sessionConfig = DEFAULT_SESSION_CONFIG.value;
   const observedAt = new Date(snapshot.sourceTimestamp);
   const sessionDate = sessionDateFor(observedAt, sessionConfig);

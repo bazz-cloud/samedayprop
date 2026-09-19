@@ -40,6 +40,8 @@ import { LEGAL_DOCUMENT_DRAFTS, hashDocumentBody } from '@/server/legal/document
 import { DEFAULT_COUPON } from '@/domain/pricing/coupon';
 import { DEFAULT_SESSION_CONFIG, sessionDateFor } from '@/domain/risk/session';
 import type { AccountSnapshot } from '@/server/providers/trading/types';
+import type { AddOnKey } from '@/domain/catalog/addons';
+import { getDashboardAccount } from '@/server/views/dashboard-view';
 
 let trading: MockTradingProvider;
 let payments: MockPaymentProvider;
@@ -162,11 +164,12 @@ async function signEverything(userId: string, quoteId: string): Promise<void> {
 /** Buy an account and drive it all the way to active. */
 async function provisionAccount(
   planKey = 'SIM_50K',
+  addOnKeys: AddOnKey[] = [],
 ): Promise<{ userId: string; orderId: string; accountId: string; externalAccountId: string }> {
   const user = await makeUser();
   const { quoteId } = await createQuote({
     planKey,
-    addOnKeys: [],
+    addOnKeys,
     couponCode: 'START25',
     userId: user.id,
   });
@@ -1312,5 +1315,69 @@ describe('ledger integrity across the whole suite', () => {
         `${ledger.ledger} is out of balance by ${ledger.net.toDecimalString()}`,
       ).toBe(true);
     }
+  });
+});
+
+describe('risk add-ons reach the engine', () => {
+  it('enforces the daily loss limit that was paid for, not the plan default', async () => {
+    const { accountId, externalAccountId } = await provisionAccount('SIM_50K', [
+      'DAILY_LOSS_UPLIFT',
+    ]);
+
+    const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    expect(account.addOnDailyLossUpliftPercent).toBe(50);
+    expect(account.addOnExtraMinis).toBe(0);
+
+    // Base limit is $595; the add-on makes it $892.50. A session loss of $700
+    // is past the base and inside the purchased one, so the account must stay
+    // open — this is the assertion that fails if the receipt and the engine
+    // ever disagree.
+    // Open the session at the starting balance, so the session P&L below is
+    // measured from 50,000 rather than from wherever the first snapshot lands.
+    await ingestSnapshot(accountId, snapshotAt(externalAccountId, '50000.00', 30n));
+    await ingestSnapshot(accountId, snapshotAt(externalAccountId, '49300.00', 31n));
+    const afterLoss = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    expect(afterLoss.tradingStatus).toBe('ACTIVE');
+
+    // $900 of session loss is past the purchased limit too.
+    await ingestSnapshot(accountId, snapshotAt(externalAccountId, '49100.00', 32n));
+    const afterBigLoss = await prisma.tradingAccount.findUniqueOrThrow({
+      where: { id: accountId },
+    });
+    expect(afterBigLoss.tradingStatus).toBe('DAILY_PAUSED');
+  });
+
+  it('raises the position ceiling by exactly two minis', async () => {
+    const { accountId } = await provisionAccount('SIM_50K', ['EXTRA_CONTRACTS']);
+    const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    expect(account.addOnExtraMinis).toBe(2);
+
+    const card = (await getDashboardAccount(account.userId, accountId))!;
+    // 4 minis becomes 6, i.e. 60 micro-equivalents.
+    expect(card.exposureCap).toBe(60);
+    expect(card.riskUpgrades).toEqual(['Position ceiling +2 minis (add-on)']);
+  });
+
+  it('keeps an account on the limits it bought after the catalog price changes', async () => {
+    // The deltas live on the account, not in the live catalog, so this is the
+    // snapshot guarantee every other agreed term already has.
+    const { accountId } = await provisionAccount('SIM_50K', ['DAILY_LOSS_UPLIFT']);
+    const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    expect(account.addOnDailyLossUpliftPercent).toBe(50);
+
+    const card = (await getDashboardAccount(account.userId, accountId))!;
+    expect(card.dailyLossLimit.display).toBe('$892.50');
+  });
+
+  it('leaves an account with no add-ons on the plan limits exactly', async () => {
+    const { accountId } = await provisionAccount('SIM_50K');
+    const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+    expect(account.addOnDailyLossUpliftPercent).toBe(0);
+    expect(account.addOnExtraMinis).toBe(0);
+
+    const card = (await getDashboardAccount(account.userId, accountId))!;
+    expect(card.dailyLossLimit.display).toBe('$595.00');
+    expect(card.exposureCap).toBe(40);
+    expect(card.riskUpgrades).toEqual([]);
   });
 });

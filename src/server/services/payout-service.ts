@@ -37,7 +37,7 @@ import {
 } from '@/domain/payout/state-machine';
 import { DEFAULT_SESSION_CONFIG, lockoutHasLifted, sessionDateFor } from '@/domain/risk/session';
 import { buildObligationEntry, buildPayoutEntries } from '@/domain/ledger/entries';
-import { lifetimeCapForPayout, toRuleSnapshot } from './catalog-service';
+import { effectiveRules, lifetimeCapForPayout, toRuleSnapshot } from './catalog-service';
 import { checkPayoutProfile } from '@/domain/customer/profile';
 import { checkLifetimeCapReached } from '@/domain/analytics/exposure';
 import { postEntries, postEntry } from './ledger-service';
@@ -90,7 +90,7 @@ export async function getPayoutView(tradingAccountId: string): Promise<PayoutVie
     where: { id: tradingAccountId },
     include: { planVersion: true },
   });
-  const rules = toRuleSnapshot(account.planVersion);
+  const rules = effectiveRules(toRuleSnapshot(account.planVersion), account);
   const sessionDate = sessionDateFor(new Date(), DEFAULT_SESSION_CONFIG.value);
 
   // An unresolved lifetime cap blocks payouts rather than defaulting to
@@ -238,7 +238,7 @@ export async function requestPayout(input: {
     throw new PayoutError(validation.reason ?? 'INVALID', validation.message ?? 'Request refused.');
   }
 
-  const rules = toRuleSnapshot(account.planVersion);
+  const rules = effectiveRules(toRuleSnapshot(account.planVersion), account);
   const lifetimeCap = lifetimeCapForPayout(rules);
 
   return prisma.$transaction(async (tx) => {
@@ -599,7 +599,7 @@ export async function closeIfLifetimeCapReached(
   if (!account) return false;
   if (account.tradingStatus === 'CLOSED' || account.tradingStatus === 'BREACHED') return false;
 
-  const rules = toRuleSnapshot(account.planVersion);
+  const rules = effectiveRules(toRuleSnapshot(account.planVersion), account);
   let capMinor: bigint | null;
   try {
     capMinor = lifetimeCapForPayout(rules)?.minor ?? null;

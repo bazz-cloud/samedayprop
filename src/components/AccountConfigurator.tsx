@@ -289,7 +289,7 @@ export function AccountConfigurator({
             <SectionHeading
               number={3}
               title="Optional extras"
-              hint="None of these affect your rules or payouts."
+              hint="These change your risk limits. Neither changes your payouts."
             />
             <h3 id="extras-heading" className="sr-only">
               Optional extras
@@ -298,6 +298,9 @@ export function AccountConfigurator({
               <legend className="sr-only">Optional extras</legend>
               {addOns.map((addon) => {
                 const selected = selectedAddOns.includes(addon.key);
+                // Priced per plan, so the figure follows the account size
+                // selected in step 1 rather than quoting one flat number.
+                const price = addon.pricesByPlan.find((entry) => entry.planKey === planKey);
                 return (
                   <label
                     key={addon.key}
@@ -316,16 +319,23 @@ export function AccountConfigurator({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-3 flex-wrap">
                         <span className="font-medium">{addon.name}</span>
-                        <span className="tnum text-sm">
-                          <span className="text-accent font-semibold">
-                            {addon.couponPrice.display}
-                          </span>{' '}
-                          <span className="was-price">
-                            {addon.listPrice.display}
+                        {price && (
+                          <span className="tnum text-sm">
+                            <span className="text-accent font-semibold">
+                              {price.couponPrice.display}
+                            </span>{' '}
+                            <span className="was-price">{price.listPrice.display}</span>
                           </span>
-                        </span>
+                        )}
                       </div>
-                      <p className="text-sm text-fg-muted mt-1">{addon.delivery}</p>
+                      <p className="label mt-1.5 text-[10px] text-accent">{addon.effect}</p>
+                      <p className="text-sm text-fg-muted mt-1">{addon.description}</p>
+                      {/* The limitation sits with the price, at the same size as
+                          the description. An upgrade that raises variance has to
+                          say so where it is being sold. */}
+                      <p className="text-xs text-fg-subtle mt-1.5 leading-relaxed">
+                        {addon.limitation}
+                      </p>
                       {addon.status !== 'CONFIRMED' && (
                         <span className="inline-block mt-2">
                           <Badge tone="warn">Price not final</Badge>
@@ -336,7 +346,11 @@ export function AccountConfigurator({
                 );
               })}
             </fieldset>
-            <Callout tone="neutral">No extra changes your rules or your payouts.</Callout>
+            <Callout tone="neutral">
+              An extra can raise your daily loss limit or your position ceiling. Nothing sold here
+              changes your trailing drawdown, your payout split, your daily cash cap or your
+              lifetime cap, and nothing here is required to get paid.
+            </Callout>
           </section>
 
           <section aria-labelledby="coupon-heading">

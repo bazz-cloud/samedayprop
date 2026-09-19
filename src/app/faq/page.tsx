@@ -68,7 +68,7 @@ export const FAQS: readonly FaqEntry[] = [
   },
   {
     q: 'Do I have to buy an add-on to get paid, or to see my stats?',
-    a: 'No. Stats, rules, payouts, exports, security and support are included with every account. No paid extra changes your rules, your limits or your payouts.',
+    a: 'No. Stats, rules, payouts, exports, security and support come with every account, and nothing you can buy changes your payout split or your caps. Two extras raise risk limits, which raises variance, not your odds.',
   },
   {
     q: 'What happens if my payment succeeds but my account is not created?',

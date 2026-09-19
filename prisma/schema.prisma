@@ -234,11 +234,22 @@ model AddOnVersion {
   version               Int
   name                  String
   description           String
-  listPriceMinor        BigInt
-  deliveryKind          String // download | timed-entitlement | scheduled-session
+  /// What the add-on does NOT do, shown beside the price.
+  limitation            String   @default("")
+  /// JSON map of plan key -> price in minor units. Add-ons that change risk
+  /// terms are priced per plan: two contracts on $25,000 is not the same
+  /// product as two contracts on $300,000.
+  listPricesJson        String   @default("{}")
+  deliveryKind          String // download | timed-entitlement | scheduled-session | risk-parameter
   deliveryDays          Int?
   deliveryMinutes       Int?
-  assumedUnitCostMinor  BigInt
+  /// daily-loss-uplift | extra-contracts. Null for an add-on that changes no
+  /// risk term.
+  effectKind            String?
+  /// Percentage points for an uplift, or extra minis for contracts.
+  effectValue           Int?
+  /// Null where nothing is delivered: these add-ons cost risk, not fulfilment.
+  assumedUnitCostMinor  BigInt?
   requiresCapacityCheck Boolean  @default(false)
   couponEligible        Boolean  @default(true)
   // DRAFT | PUBLISHED | RETIRED
@@ -497,6 +508,13 @@ model TradingAccount {
   startingBalanceMinor BigInt
   /// Reconciled simulated balance. Authoritative for payouts.
   balanceMinor         BigInt
+
+  /// Risk deltas bought with add-ons, snapshotted at provisioning so a later
+  /// catalog edit cannot change the limits enforced on an account already sold.
+  /// Percentage points added to the plan's daily loss limit.
+  addOnDailyLossUpliftPercent Int @default(0)
+  /// Extra mini contracts; micros scale ten to one.
+  addOnExtraMinis             Int @default(0)
   equityMinor          BigInt
   /// H — highest observed intraday equity.
   highWaterMinor       BigInt

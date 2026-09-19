@@ -14,7 +14,7 @@
 import { prisma } from '@/server/db';
 import { Money } from '@/domain/money/money';
 import { serialiseMoney, type SerialisedMoney } from '@/server/money-mapper';
-import { toRuleSnapshot } from '@/server/services/catalog-service';
+import { effectiveRules, toRuleSnapshot } from '@/server/services/catalog-service';
 import { getPayoutView } from '@/server/services/payout-service';
 import { STALENESS_THRESHOLD_MS } from '@/server/services/risk-service';
 import { ceilingToMicroEquivalents } from '@/domain/risk/exposure';
@@ -105,6 +105,12 @@ export interface DashboardAccount {
   readonly sessionDate: string | null;
   readonly sessionPnl: SerialisedMoney;
   readonly dailyLossLimit: SerialisedMoney;
+  /**
+   * Risk add-ons bought with this account, described in the terms they changed.
+   * Empty when none were bought. Shown so a trader can see the limit they paid
+   * for is the limit being enforced.
+   */
+  readonly riskUpgrades: readonly string[];
   readonly dailyLossUsed: SerialisedMoney;
   readonly dailyLossRemaining: SerialisedMoney;
 
@@ -192,7 +198,8 @@ export async function getDashboardAccount(
   // Object-level authorisation, checked here rather than trusting the caller.
   if (!account || account.userId !== userId) return null;
 
-  const rules = toRuleSnapshot(account.planVersion);
+  // The trader sees the limits actually enforced on them, add-ons included.
+  const rules = effectiveRules(toRuleSnapshot(account.planVersion), account);
   const view = await getPayoutView(account.id);
 
   const [checkpoint, positionSnapshot, riskEvents, payouts, entitlements] = await Promise.all([
@@ -258,6 +265,14 @@ export async function getDashboardAccount(
     sessionDate: account.sessionDate,
     sessionPnl: serialiseMoney(sessionTradingPnl(dailyState, equity)),
     dailyLossLimit: serialiseMoney(rules.dailyLossLimit),
+    riskUpgrades: [
+      ...(account.addOnDailyLossUpliftPercent > 0
+        ? [`Daily loss limit +${account.addOnDailyLossUpliftPercent}% (add-on)`]
+        : []),
+      ...(account.addOnExtraMinis > 0
+        ? [`Position ceiling +${account.addOnExtraMinis} minis (add-on)`]
+        : []),
+    ],
     dailyLossUsed: serialiseMoney(dailyLossUsed(dailyState, equity)),
     dailyLossRemaining: serialiseMoney(dailyLossRemaining(dailyState, equity, rules.dailyLossLimit)),
 

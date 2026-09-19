@@ -15,6 +15,7 @@
 import type { Prisma } from '@/generated/prisma';
 import { prisma } from '@/server/db';
 import { Money } from '@/domain/money/money';
+import { isAddOnKey, riskDeltasFor, type AddOnKey } from '@/domain/catalog/addons';
 import { ceilingToMicroEquivalents } from '@/domain/risk/exposure';
 import {
   assertTransition,
@@ -24,7 +25,7 @@ import {
 import { computeThreshold } from '@/domain/risk/trailing';
 import { getTradingProvider } from '@/server/providers/registry';
 import { requireCapability } from '@/server/providers/trading/types';
-import { toRuleSnapshot } from './catalog-service';
+import { effectiveRules, toRuleSnapshot } from './catalog-service';
 import { recordAudit } from './audit-service';
 import { issueCredential } from './credential-service';
 import { enqueueJob } from '@/server/jobs/queue';
@@ -60,7 +61,7 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
 
   const order = await prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    include: { user: true, planVersion: true },
+    include: { user: true, planVersion: true, items: true },
   });
 
   if (order.status !== 'PAID' && order.status !== 'FULFILLED') {
@@ -72,7 +73,19 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
   }
 
   const provider = getTradingProvider();
-  const rules = toRuleSnapshot(order.planVersion);
+  const baseRules = toRuleSnapshot(order.planVersion);
+
+  // Risk add-ons bought on this order. Read from the ORDER, which is the record
+  // of what was agreed and paid for, and written onto the account below so the
+  // engine never has to consult the catalog again for this account.
+  const purchasedAddOns = order.items
+    .filter((item) => item.kind === 'ADDON' && isAddOnKey(item.itemKey))
+    .map((item) => item.itemKey as AddOnKey);
+  const deltas = riskDeltasFor(purchasedAddOns);
+  const rules = effectiveRules(baseRules, {
+    addOnDailyLossUpliftPercent: Number(deltas.dailyLossUpliftPercent),
+    addOnExtraMinis: deltas.extraMinis,
+  });
 
   // ---- 1. Create the external account -------------------------------------
   let account = await prisma.tradingAccount.findUnique({ where: { orderId } });
@@ -129,6 +142,8 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
           equityMinor: rules.startingBalance.minor,
           highWaterMinor: rules.startingBalance.minor,
           thresholdMinor: threshold.minor,
+          addOnDailyLossUpliftPercent: Number(deltas.dailyLossUpliftPercent),
+          addOnExtraMinis: deltas.extraMinis,
           // Nothing authoritative has arrived yet, so the account starts stale.
           dataStale: true,
         },

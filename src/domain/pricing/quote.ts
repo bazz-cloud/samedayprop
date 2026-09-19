@@ -14,7 +14,7 @@
 
 import { Money, usd, USD, type Currency } from '../money/money';
 import { allocateProportionally } from '../money/allocate';
-import { getAddOn, isAddOnKey, type AddOnKey } from '../catalog/addons';
+import { addOnPrice, getAddOn, isAddOnKey, type AddOnKey } from '../catalog/addons';
 import { getPlan, isPlanKey, planLaunchBlockers, type PlanKey } from '../catalog/plans';
 import { confirmed, unresolved, type Governed } from '../config/requirement-status';
 import { POLICY_DRAFTS, policiesBlockProductionSale } from '../policy/policies';
@@ -167,13 +167,17 @@ export function buildQuote(input: QuoteInput): Quote {
     },
     ...input.selection.addOnKeys.map((key) => {
       const addon = getAddOn(key);
+      // Priced against the plan being bought, not a flat figure: these add-ons
+      // change risk terms, and the same uplift is worth a different amount on a
+      // $25,000 account than on a $300,000 one.
+      const price = addOnPrice(addon, plan.key);
       return {
         kind: 'ADDON' as const,
         itemKey: addon.key,
         name: addon.name,
         quantity: 1,
-        unitListPrice: addon.listPrice.value,
-        lineSubtotal: addon.listPrice.value,
+        unitListPrice: price,
+        lineSubtotal: price,
         couponEligible: addon.couponEligible,
       };
     }),
@@ -252,10 +256,10 @@ export function buildQuote(input: QuoteInput): Quote {
 
   for (const key of input.selection.addOnKeys) {
     const addon = getAddOn(key);
-    if (addon.listPrice.status !== 'CONFIRMED') {
+    if (addon.listPriceByPlan.status !== 'CONFIRMED') {
       productionBlockers.push({
-        code: `ADDON_PRICE_${addon.listPrice.status}`,
-        detail: `${addon.name} price is ${addon.listPrice.status} and not approved for sale.`,
+        code: `ADDON_PRICE_${addon.listPriceByPlan.status}`,
+        detail: `${addon.name} pricing is ${addon.listPriceByPlan.status} and not approved for sale.`,
       });
     }
   }
@@ -327,7 +331,9 @@ export function refundAllocationForLine(quote: Quote, itemKey: string): Money {
 }
 
 export const EXAMPLE_FIFTY_K_WITH_ALL_ADDONS = {
-  description: '$50,000 account plus all three candidate add-ons with the 25% coupon',
-  arithmetic: '(599 + 19 + 29 + 49) * 0.75',
-  expectedTotal: usd('522.00'),
+  description:
+    '$50,000 account plus both risk add-ons with the 25% coupon, then 6% Michigan sales tax',
+  arithmetic: '(599 + 79 + 99) * 0.75 * 1.06',
+  expectedTaxableTotal: usd('582.75'),
+  expectedTotal: usd('617.72'),
 } as const;

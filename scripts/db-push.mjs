@@ -50,7 +50,17 @@ if (direct) {
   );
 }
 
-const result = spawnSync('npx', ['prisma', 'db', 'push', '--skip-generate'], {
+// A push that would drop a populated column stops by default: silently losing
+// a column of a live database during a deploy is not a thing that should be
+// possible. When a schema change genuinely retires data — a withdrawn product,
+// a replaced column — set ALLOW_DB_DATA_LOSS=1 for that one deploy.
+const args = ['prisma', 'db', 'push', '--skip-generate'];
+if (process.env.ALLOW_DB_DATA_LOSS === '1') {
+  console.warn('\n  ALLOW_DB_DATA_LOSS=1: this push may drop columns or tables.\n');
+  args.push('--accept-data-loss');
+}
+
+const result = spawnSync('npx', args, {
   stdio: 'inherit',
   env,
 });

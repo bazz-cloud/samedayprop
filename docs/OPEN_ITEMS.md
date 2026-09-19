@@ -8,10 +8,24 @@ commercial decision, or a credential I must never hold.
 
 ---
 
+## 0. Decided 2026-09-19 — what changed
+
+| Decision | Effect |
+|---|---|
+| Trailing threshold **never stops rising** | Replaces the $100 stop. Room above the threshold is now capped at the drawdown allowance, so one request can never reach the daily cash cap. Published on /payouts. |
+| **Michigan sales tax, 6%** | Added to the discounted total. Two questions for your accountant are open, below. |
+| Policies | **TBD** — still the only thing blocking a production sale. |
+| **START25 confirmed** | Unlimited uses, no per-customer limit, no expiry. Not auto-applied; typed in at checkout. Effectively the price, so the stress model uses the discounted figure. |
+| Add-ons replaced | Two risk upgrades — bigger daily loss limit, two more contracts — replacing the journal/analytics/setup candidates. **Prices are drafted and need your approval.** |
+| Items 8–11 confirmed | Session boundary, whole-dollar increments, $0.01 post-withdrawal room, reset restores to starting balance. |
+
 ## 1. Blocks taking real money
 
 | Item | Why it blocks | Status |
 |---|---|---|
+| **Add-on prices** — two risk upgrades, five plans each | Drafted at $49–$249 (daily loss uplift) and $69–$329 (two contracts), scaling with account size. PROPOSED, so any order containing one is blocked from production sale. |
+| **Sales tax: is this fee taxable in Michigan?** | Michigan taxes tangible property and prewritten software delivered electronically, not most services. An accountant has to answer it; the 6% is being charged meanwhile. |
+| **Sales tax: destination or origin?** | Sales tax is normally destination-based. We charge 6% to every buyer regardless of state, as instructed. Switching needs only the buyer's region, which the profile already stores. |
 | **Company legal details** — entity name, jurisdiction, registered address, support email | Agreements have no counterparty on them. Also blocks governing law, arbitration and tax clauses, which all depend on jurisdiction. | Not started |
 | **Payment provider** | No hosted checkout. `PAYMENTS_*` blank selects the mock; setting them selects an adapter that is not implemented and throws by design. | Not started |
 | **Cash payout rail** | Nothing can pay a trader. The console produces a payout instruction; a human executes it somewhere. | Not started |
@@ -60,6 +74,24 @@ sender.
 | **Discord for affiliate coupons** | Needs a decision on attribution: a code shared in a channel is not attributable to one referrer unless each affiliate gets their own. Also interacts with correlated-account risk — a cheap code in a trading server is how five-account copiers get assembled. |
 | **Affiliate terms** | Payout rate, when it vests, whether it survives a refund or a chargeback. |
 
+## 5a. Consequences of the no-stop trailing rule
+
+Not decisions — arithmetic, listed so they are not discovered later.
+
+- **The daily cash cap is unreachable in a single request on every tier.** Room
+  above the threshold is at most the drawdown allowance, so one request can pay
+  at most $449.50 / $899.50 / $1,349.50 / $2,024.50 / $3,374.50 against caps of
+  $1,000 / $1,500 / $2,500 / $3,000 / $4,000. Reaching the cap takes several
+  requests with new profit between them. /payouts states this.
+- **A full withdrawal leaves the account at the edge.** Taking all available room
+  leaves equity just above the threshold until the trader trades back up. If you
+  want a cushion instead, the lever is `MIN_POST_WITHDRAWAL_ROOM` — currently
+  $0.01, which you approved.
+- **Optional:** lowering the published daily cash caps to match what is actually
+  payable would remove the gap between the advertised cap and the reachable one.
+  I have NOT done this; the cap is a ceiling, not a promise, and the page now
+  explains the binding constraint.
+
 ## 6. Decided, no action needed
 
 Recorded so they are not reopened by accident.
@@ -68,6 +100,12 @@ Recorded so they are not reopened by accident.
 - Risk table — daily loss, drawdown, buffer and daily cash caps, all approved.
 - $300,000 position ceiling — 15 minis / 150 micros.
 - Ten trading and account policies — drafted; three need counsel on wording.
+- Trailing threshold never stops rising. Approved 2026-09-19.
+- Michigan sales tax 6%, on the discounted total. Approved 2026-09-19.
+- START25: 25%, unlimited, no expiry, typed in at checkout. Approved 2026-09-19.
+- Session boundary 17:00 America/New_York; whole-dollar gross withdrawals;
+  $0.01 of post-withdrawal room; a reset restores the starting balance.
+- A reset does NOT reopen an account that reached its lifetime cap.
 
 ---
 
@@ -88,5 +126,12 @@ Not your to-do list — mine, or things that need a migration you should approve
   $0 against $8,000 of paid orders. The admin console reports both sources and
   flags the disagreement rather than hiding it. Revenue posting belongs in
   provisioning, not only in live checkout.
+- **The next deploy needs `ALLOW_DB_DATA_LOSS=1` once.** The add-on table lost
+  two columns when the three candidate products were replaced. `db-push` refuses
+  a destructive push by default, which is the behaviour you want every other
+  time; set that variable for one deploy and then remove it.
+- **No holiday calendar.** The session boundary is approved, but exchange
+  holidays and per-instrument schedules are not loaded, so session dates are
+  wrong on a holiday. Needs the exchange calendar.
 - **"Traded at least once"** in the funnel is derived from the trade table. Once
   a real provider feeds snapshots but not fills, that figure will understate.

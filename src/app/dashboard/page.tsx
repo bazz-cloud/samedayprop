@@ -363,6 +363,9 @@ export default async function DashboardPage({
                 value={account.highWater.display}
                 hint="Includes unrealized peaks on open positions."
               />
+              {account.riskUpgrades.map((upgrade) => (
+                <DataRow key={upgrade} label="Upgrade applied" value={upgrade} />
+              ))}
               <DataRow
                 label="Threshold stops rising at"
                 value={account.trailingStopsAt?.display ?? 'It never stops'}

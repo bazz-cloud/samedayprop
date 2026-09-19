@@ -18,7 +18,7 @@ import {
   planLaunchBlockers,
   type PlanDefinition,
 } from '@/domain/catalog/plans';
-import { ADDONS } from '@/domain/catalog/addons';
+import { ADDONS, addOnPrice } from '@/domain/catalog/addons';
 import { DEFAULT_COUPON } from '@/domain/pricing/coupon';
 import { serialiseMoney, type SerialisedMoney } from '@/server/money-mapper';
 import {
@@ -107,8 +107,17 @@ export interface AddOnView {
   readonly key: string;
   readonly name: string;
   readonly description: string;
-  readonly listPrice: SerialisedMoney;
-  readonly couponPrice: SerialisedMoney;
+  /** What it does not do. Shown beside the price, never in a tooltip. */
+  readonly limitation: string;
+  /** The price on each plan, cheapest first. */
+  readonly pricesByPlan: readonly {
+    planKey: string;
+    planLabel: string;
+    listPrice: SerialisedMoney;
+    couponPrice: SerialisedMoney;
+  }[];
+  /** One line describing the change to the account's limits. */
+  readonly effect: string;
   readonly delivery: string;
   readonly requiresCapacityCheck: boolean;
   readonly status: string;
@@ -372,16 +381,30 @@ export function getAddOnViews(): AddOnView[] {
     key: addon.key,
     name: addon.name,
     description: addon.description,
-    listPrice: serialiseMoney(addon.listPrice.value),
-    couponPrice: serialiseMoney(couponPrice(addon.listPrice.value, percent)),
+    limitation: addon.limitation,
+    pricesByPlan: PLANS.map((plan) => {
+      const price = addOnPrice(addon, plan.key);
+      return {
+        planKey: plan.key,
+        planLabel: plan.label,
+        listPrice: serialiseMoney(price),
+        couponPrice: serialiseMoney(couponPrice(price, percent)),
+      };
+    }),
+    effect:
+      addon.effect.kind === 'daily-loss-uplift'
+        ? `Daily loss limit +${addon.effect.percentOfBase}%`
+        : `Position ceiling +${addon.effect.extraMinis} minis / +${addon.effect.extraMinis * 10} micros`,
     delivery:
       addon.delivery.kind === 'download'
         ? 'Instant download. One-time purchase.'
         : addon.delivery.kind === 'timed-entitlement'
           ? `${addon.delivery.days} days of access. Does not auto-renew.`
-          : `One scheduled ${addon.delivery.minutes}-minute session, subject to available slots.`,
+          : addon.delivery.kind === 'scheduled-session'
+            ? `One scheduled ${addon.delivery.minutes}-minute session, subject to available slots.`
+            : 'Applied to your account when it is created. Lasts the life of the account.',
     requiresCapacityCheck: addon.requiresCapacityCheck,
-    status: addon.listPrice.status,
+    status: addon.listPriceByPlan.status,
   }));
 }
 

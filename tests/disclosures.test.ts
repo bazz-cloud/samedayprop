@@ -153,6 +153,14 @@ const REQUIRED: readonly { page: string; label: string; text: string }[] = [
     text: 'Michigan sales tax of 6% is added to the discounted total at checkout',
   },
   {
+    // Two add-ons now change risk limits, so a blanket "no paid extra changes
+    // your rules" would be false. What must stay true, and is what the system
+    // actually enforces, is that nothing purchasable improves a payout.
+    page: 'src/components/AccountConfigurator.tsx',
+    label: 'no extra changes the payout terms',
+    text: 'Nothing sold here changes your trailing drawdown, your payout split, your daily cash cap or your lifetime cap, and nothing here is required to get paid.',
+  },
+  {
     // The ticker advertises the terms it is offering. If the coupon ever gains
     // an expiry or a usage limit, this line becomes false and has to move with
     // it — the test is here so it cannot be forgotten.

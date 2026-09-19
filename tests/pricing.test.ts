@@ -3,7 +3,12 @@ import { Money, usd } from '@/domain/money/money';
 import { allocateByWeight, allocateProportionally } from '@/domain/money/allocate';
 import { MINIMUM_GROSS_WITHDRAWAL, PLANS, couponPrice, getPlan } from '@/domain/catalog/plans';
 import { getPlanViews } from '@/server/views/catalog-view';
-import { buildQuote, canonicaliseQuote, TAX_NOT_CONFIGURED } from '@/domain/pricing/quote';
+import {
+  buildQuote,
+  canonicaliseQuote,
+  EXAMPLE_FIFTY_K_WITH_ALL_ADDONS,
+  TAX_NOT_CONFIGURED,
+} from '@/domain/pricing/quote';
 import { DEFAULT_COUPON, normaliseCouponCode, validateCoupon } from '@/domain/pricing/coupon';
 import {
   lifetimeCapAmountMinor,
@@ -79,28 +84,46 @@ describe('all six 25% coupon prices match the confirmed table exactly', () => {
 });
 
 describe('quote composition', () => {
-  it('$50K plus all candidate add-ons is exactly $522.00 before applicable tax', () => {
+  it('$50K plus both risk add-ons is $582.75 before tax and $617.72 after', () => {
     const quote = buildQuote({
       selection: {
         planKey: 'SIM_50K',
-        addOnKeys: ['JOURNAL_KIT', 'ADVANCED_ANALYTICS', 'GUIDED_SETUP'],
+        addOnKeys: ['DAILY_LOSS_UPLIFT', 'EXTRA_CONTRACTS'],
         couponCode: coupon.code,
       },
       coupon,
     });
-    expect(quote.subtotal.toDecimalString()).toBe('696.00');
-    expect(quote.discountTotal.toDecimalString()).toBe('174.00');
-    expect(quote.taxableTotal.toDecimalString()).toBe('522.00');
-    // 6% of 522.00 is exactly 31.32, so this case needs no rounding rule.
-    expect(quote.tax.toDecimalString()).toBe('31.32');
-    expect(quote.total.toDecimalString()).toBe('553.32');
+    // 599 + 79 + 99 = 777, less 25%, plus 6%.
+    expect(quote.subtotal.toDecimalString()).toBe('777.00');
+    expect(quote.discountTotal.toDecimalString()).toBe('194.25');
+    expect(quote.taxableTotal.toDecimalString()).toBe('582.75');
+    expect(quote.total.toDecimalString()).toBe('617.72');
+    expect(quote.taxableTotal.equals(EXAMPLE_FIFTY_K_WITH_ALL_ADDONS.expectedTaxableTotal)).toBe(
+      true,
+    );
+    expect(quote.total.equals(EXAMPLE_FIFTY_K_WITH_ALL_ADDONS.expectedTotal)).toBe(true);
+  });
+
+  it('prices an add-on against the plan it is bought with, not a flat figure', () => {
+    const small = buildQuote({
+      selection: { planKey: 'SIM_25K', addOnKeys: ['EXTRA_CONTRACTS'], couponCode: null },
+      coupon: null,
+    });
+    const large = buildQuote({
+      selection: { planKey: 'SIM_300K', addOnKeys: ['EXTRA_CONTRACTS'], couponCode: null },
+      coupon: null,
+    });
+    const priceOf = (q: typeof small) =>
+      q.lines.find((line) => line.itemKey === 'EXTRA_CONTRACTS')!.lineSubtotal.toDecimalString();
+    expect(priceOf(small)).toBe('69.00');
+    expect(priceOf(large)).toBe('329.00');
   });
 
   it('allocates the discount across lines so the parts sum to the whole', () => {
     const quote = buildQuote({
       selection: {
         planKey: 'SIM_50K',
-        addOnKeys: ['JOURNAL_KIT', 'ADVANCED_ANALYTICS', 'GUIDED_SETUP'],
+        addOnKeys: ['DAILY_LOSS_UPLIFT', 'EXTRA_CONTRACTS'],
         couponCode: coupon.code,
       },
       coupon,
@@ -109,15 +132,13 @@ describe('quote composition', () => {
     expect(summed.equals(quote.discountTotal)).toBe(true);
     expect(quote.lines.map((l) => l.lineDiscount.toDecimalString())).toEqual([
       '149.75',
-      '4.75',
-      '7.25',
-      '12.25',
+      '19.75',
+      '24.75',
     ]);
     expect(quote.lines.map((l) => l.lineTotal.toDecimalString())).toEqual([
       '449.25',
-      '14.25',
-      '21.75',
-      '36.75',
+      '59.25',
+      '74.25',
     ]);
   });
 
@@ -136,7 +157,7 @@ describe('quote composition', () => {
   it('rejects duplicate add-on selections rather than double-charging', () => {
     expect(() =>
       buildQuote({
-        selection: { planKey: 'SIM_25K', addOnKeys: ['JOURNAL_KIT', 'JOURNAL_KIT'], couponCode: null },
+        selection: { planKey: 'SIM_25K', addOnKeys: ['EXTRA_CONTRACTS', 'EXTRA_CONTRACTS'], couponCode: null },
         coupon: null,
       }),
     ).toThrow(/more than once/);
