@@ -15,7 +15,10 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset --skip-generate && npm run db:seed",
     "worker": "tsx src/server/jobs/worker-entry.ts",
-    "setup": "prisma generate && prisma db push --skip-generate && npm run db:seed"
+    "setup": "prisma generate && prisma db push --skip-generate && npm run db:seed",
+    "postinstall": "node scripts/set-db-provider.mjs && prisma generate",
+    "vercel-build": "node scripts/set-db-provider.mjs && prisma generate && prisma db push --skip-generate && node scripts/seed-if-demo.mjs && next build",
+    "db:provider": "node scripts/set-db-provider.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
