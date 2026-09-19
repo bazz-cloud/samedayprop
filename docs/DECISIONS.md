@@ -128,22 +128,30 @@ Other proposed defaults:
 |---|---|---|
 | $300,000 | 15 minis / 150 micros | NOT finalised |
 
-### Policies with no default
+### Policies now drafted, awaiting approval
 
-Each is configurable and **none has been invented**. The application ships with
-no restriction in place and no permission granted; the policy simply does not
-exist yet.
+These ten had no default and no wording. They are now drafted in
+`src/domain/policy/policies.ts`, rendered on `/rules#policies` behind a banner
+saying they are not yet binding, and marked PROPOSED — so they still block
+production sale until approved.
 
-- Automated trading systems and bots
-- News trading
-- Cross-account hedging
-- Copy trading and trade mirroring
-- Restricted countries and geographic eligibility
-- Refunds and cancellation
-- Account inactivity
-- Account resets
-- Prohibited conduct, suspension evidence standards and the appeal route
-- Program completion and account closure
+| Policy | Proposed stance |
+|---|---|
+| Automated trading systems | Execution aids allowed; fully autonomous systems need written approval; fill-model exploitation prohibited outright |
+| News trading | Permitted, no blackout windows |
+| Cross-account hedging | Prohibited |
+| Copy trading and signal services | Following allowed; mirroring across accounts you do not own prohibited; coordinated groups treated as one position |
+| Who can open an account | 18+, outside sanctioned jurisdictions, one account each, identity verified at payout with a full refund if verification fails |
+| Refunds and cancellation | Full refund before credentials, or within 7 days with no trades; delivered once traded; full refund when the failure is ours |
+| Inactive accounts | Closed after 90 days with no trades, warned at 60 and 83 |
+| Resets | Available on an account that can no longer trade, unlimited, never restores payout capacity, refused at the lifetime cap |
+| Prohibited conduct, evidence and appeals | Named conduct list, documented findings disclosed to the trader, 30-day appeal reviewed by an uninvolved person, answered in 10 business days |
+| How an account ends | Cap reached, drawdown breached, closed by you, or closed by us; withdrawn plans do not retire paid accounts; 12 months of record access |
+
+Three of them — eligibility, refunds, and the conduct/appeal process — are
+marked `needsLegalReview`. Approving the commercial shape does not settle the
+wording, and the sanctioned-country list is a legal determination that has not
+been invented here.
 
 ### Legal and tax
 

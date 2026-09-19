@@ -126,11 +126,14 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
     q: 'Which countries can buy an account?',
     a: (
       <>
-        Geographic eligibility has not yet been settled and is marked as outstanding in our{' '}
-        <Link href="/legal/trader-agreement" className="text-accent hover:underline">
-          trader agreement
+        Adults outside sanctioned jurisdictions, one account each. The country list itself is a
+        legal question rather than a commercial one, so it is not published yet — the draft policy
+        is on our{' '}
+        <Link href="/rules#policies" className="text-accent hover:underline">
+          rules page
         </Link>
-        . We are not going to guess at it here.
+        . Identity is verified before your first payout, not before you buy, and if you cannot
+        complete verification we refund the purchase in full.
       </>
     ),
   },
@@ -138,11 +141,49 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
     q: 'Can I get a refund?',
     a: (
       <>
-        The refund and cancellation policy has not been settled. It is marked as outstanding in our{' '}
-        <Link href="/legal/purchase-and-refund-terms" className="text-accent hover:underline">
-          purchase terms
+        Full refund before your credentials are issued, and within 7 days of purchase if you have
+        placed no trades. Once you have traded the account, it has been delivered. If we close your
+        account for a reason that is not your breach, you are refunded in full regardless. The full
+        draft is on our{' '}
+        <Link href="/rules#policies" className="text-accent hover:underline">
+          rules page
         </Link>
-        , and accounts are not sold for real money until it is resolved.
+        , and it is still awaiting approval.
+      </>
+    ),
+  },
+  {
+    q: 'Can I use a bot or an EA?',
+    a: (
+      <>
+        Execution tools are fine — hotkeys, brackets, trailing stops, position sizing. A fully
+        autonomous system that trades without you needs our written approval first. Anything whose
+        edge comes from the simulated fill model rather than the market is prohibited outright. See
+        the{' '}
+        <Link href="/rules#policies" className="text-accent hover:underline">
+          policy drafts
+        </Link>
+        .
+      </>
+    ),
+  },
+  {
+    q: 'Can I trade the news?',
+    a: (
+      <>
+        Yes. No blackout windows, and your limits do not change around releases. Fills in fast
+        markets can differ sharply from your screen, and a gap through your stop is still a breach.
+      </>
+    ),
+  },
+  {
+    q: 'What happens when I hit the lifetime payout cap?',
+    a: (
+      <>
+        That account is complete. The cap is six times the account&rsquo;s daily cash cap, so
+        $6,000 on the $25,000 account up to $24,000 on the $300,000. A reset restores the balance
+        but not payout capacity, so continuing means buying a new account — and we will not sell
+        you a reset that cannot pay out.
       </>
     ),
   },

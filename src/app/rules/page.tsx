@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getPlanViews } from '@/server/views/catalog-view';
 import { Badge, Callout, Card } from '@/components/ui';
+import { POLICY_DRAFTS, type PolicyStance } from '@/domain/policy/policies';
 
 export const metadata: Metadata = {
   title: 'Rules and how it works',
@@ -13,6 +14,19 @@ function tone(status: string) {
   if (status === 'PROPOSED') return 'warn' as const;
   if (status === 'EXTERNAL') return 'info' as const;
   return 'danger' as const;
+}
+
+function stanceTone(stance: PolicyStance) {
+  if (stance === 'PERMITTED') return 'accent' as const;
+  if (stance === 'PROHIBITED') return 'danger' as const;
+  return 'info' as const;
+}
+
+function stanceLabel(stance: PolicyStance) {
+  if (stance === 'PERMITTED') return 'Allowed';
+  if (stance === 'PROHIBITED') return 'Not allowed';
+  if (stance === 'CONDITIONAL') return 'Allowed with limits';
+  return 'How it works';
 }
 
 export default function RulesPage() {
@@ -237,6 +251,41 @@ export default function RulesPage() {
           position ceiling is undecided. Accounts are not sold for real money while these remain
           open.
         </p>
+      </section>
+
+      <section aria-labelledby="policies" className="space-y-4">
+        <h2 id="policies" className="text-2xl font-bold tracking-tight">
+          Trading and account policies
+        </h2>
+        <Callout tone="warn">
+          Every policy in this section is a draft awaiting approval. Until it is approved it is not
+          a rule you have agreed to, and it is not enforced against your account.
+        </Callout>
+        <div className="space-y-4">
+          {POLICY_DRAFTS.map(({ value: policy, status }) => (
+            <Card key={policy.key}>
+              <div className="flex flex-wrap items-center gap-3">
+                <h3 className="text-lg font-bold tracking-tight">{policy.title}</h3>
+                <Badge tone={stanceTone(policy.stance)}>{stanceLabel(policy.stance)}</Badge>
+                {status !== 'CONFIRMED' && <Badge tone={tone(status)}>Draft</Badge>}
+              </div>
+              <p className="mt-2 text-fg-muted">{policy.summary}</p>
+              <ul className="mt-3 space-y-2 text-sm text-fg-subtle leading-relaxed">
+                {policy.rules.map((rule) => (
+                  <li key={rule} className="pl-4 border-l border-edge">
+                    {rule}
+                  </li>
+                ))}
+              </ul>
+              {policy.needsLegalReview && (
+                <p className="mt-3 text-xs text-fg-subtle">
+                  The wording of this policy is subject to legal review and may change before it is
+                  published as binding.
+                </p>
+              )}
+            </Card>
+          ))}
+        </div>
       </section>
 
       <p className="text-sm text-fg-subtle">
