@@ -6,9 +6,11 @@
  * payout engine, the public site, and the admin console — the UI never carries
  * its own copy of a price or a limit.
  *
- * Statuses matter as much as the numbers. Prices and a few position ceilings
- * are CONFIRMED; every risk parameter below is a PROPOSED development default
- * awaiting commercial approval, and the lifetime payout caps are UNRESOLVED.
+ * Statuses matter as much as the numbers. Prices, position ceilings, every risk
+ * parameter and the lifetime payout caps are now CONFIRMED by the owner. The
+ * few remaining PROPOSED values are derived controls introduced during
+ * implementation rather than commercial terms — the trailing stop offset, the
+ * whole-dollar withdrawal increment and the post-withdrawal room.
  * `planLaunchBlockers()` turns that into an enforceable gate.
  */
 
@@ -97,7 +99,7 @@ export const MIN_POST_WITHDRAWAL_ROOM: Governed<Money> = proposed(
 );
 
 const CONFIRMED_PRICE = 'Build prompt §2 confirmed price table';
-const PROPOSED_RISK = 'Build prompt §2 proposed defaults table — requires commercial approval';
+const APPROVED_RISK = 'Owner-approved risk parameters, 2026-09-19';
 
 /**
  * Lifetime cash payout cap: six times the account's daily cash payout cap.
@@ -144,9 +146,9 @@ const RAW_PLANS: readonly PlanWithoutDerivedCap[] = [
     startingBalance: usd('25000.00'),
     listPrice: confirmed(usd('349.00'), 'One-time purchase, not a subscription.', CONFIRMED_PRICE),
     positionCeiling: confirmed({ minis: 2, micros: 20 }, undefined, CONFIRMED_PRICE),
-    drawdownAllowance: proposed(usd('900.00'), undefined, PROPOSED_RISK),
-    dailyLossLimit: proposed(usd('340.00'), undefined, PROPOSED_RISK),
-    retainedBuffer: proposed(usd('1000.00'), undefined, PROPOSED_RISK),
+    drawdownAllowance: confirmed(usd('900.00'), undefined, APPROVED_RISK),
+    dailyLossLimit: confirmed(usd('340.00'), undefined, APPROVED_RISK),
+    retainedBuffer: confirmed(usd('1000.00'), undefined, APPROVED_RISK),
     dailyCashPayoutCap: confirmed(
       usd('1000.00'),
       'Starting daily cash payout cap of $1,000 (equivalent to $2,000 gross).',
@@ -159,10 +161,10 @@ const RAW_PLANS: readonly PlanWithoutDerivedCap[] = [
     startingBalance: usd('50000.00'),
     listPrice: confirmed(usd('599.00'), 'One-time purchase, not a subscription.', CONFIRMED_PRICE),
     positionCeiling: confirmed({ minis: 4, micros: 40 }, undefined, CONFIRMED_PRICE),
-    drawdownAllowance: proposed(usd('1800.00'), undefined, PROPOSED_RISK),
-    dailyLossLimit: proposed(usd('595.00'), undefined, PROPOSED_RISK),
-    retainedBuffer: proposed(usd('2000.00'), undefined, PROPOSED_RISK),
-    dailyCashPayoutCap: proposed(usd('1500.00'), undefined, PROPOSED_RISK),
+    drawdownAllowance: confirmed(usd('1800.00'), undefined, APPROVED_RISK),
+    dailyLossLimit: confirmed(usd('595.00'), undefined, APPROVED_RISK),
+    retainedBuffer: confirmed(usd('2000.00'), undefined, APPROVED_RISK),
+    dailyCashPayoutCap: confirmed(usd('1500.00'), undefined, APPROVED_RISK),
   },
   {
     key: 'SIM_100K',
@@ -170,10 +172,10 @@ const RAW_PLANS: readonly PlanWithoutDerivedCap[] = [
     startingBalance: usd('100000.00'),
     listPrice: confirmed(usd('999.00'), 'One-time purchase, not a subscription.', CONFIRMED_PRICE),
     positionCeiling: confirmed({ minis: 6, micros: 60 }, undefined, CONFIRMED_PRICE),
-    drawdownAllowance: proposed(usd('2700.00'), undefined, PROPOSED_RISK),
-    dailyLossLimit: proposed(usd('850.00'), undefined, PROPOSED_RISK),
-    retainedBuffer: proposed(usd('3000.00'), undefined, PROPOSED_RISK),
-    dailyCashPayoutCap: proposed(usd('2500.00'), undefined, PROPOSED_RISK),
+    drawdownAllowance: confirmed(usd('2700.00'), undefined, APPROVED_RISK),
+    dailyLossLimit: confirmed(usd('850.00'), undefined, APPROVED_RISK),
+    retainedBuffer: confirmed(usd('3000.00'), undefined, APPROVED_RISK),
+    dailyCashPayoutCap: confirmed(usd('2500.00'), undefined, APPROVED_RISK),
   },
   {
     key: 'SIM_150K',
@@ -181,26 +183,25 @@ const RAW_PLANS: readonly PlanWithoutDerivedCap[] = [
     startingBalance: usd('150000.00'),
     listPrice: confirmed(usd('1499.00'), 'One-time purchase, not a subscription.', CONFIRMED_PRICE),
     positionCeiling: confirmed({ minis: 10, micros: 100 }, undefined, CONFIRMED_PRICE),
-    drawdownAllowance: proposed(usd('4050.00'), undefined, PROPOSED_RISK),
-    dailyLossLimit: proposed(usd('1275.00'), undefined, PROPOSED_RISK),
-    retainedBuffer: proposed(usd('4500.00'), undefined, PROPOSED_RISK),
-    dailyCashPayoutCap: proposed(usd('3000.00'), undefined, PROPOSED_RISK),
+    drawdownAllowance: confirmed(usd('4050.00'), undefined, APPROVED_RISK),
+    dailyLossLimit: confirmed(usd('1275.00'), undefined, APPROVED_RISK),
+    retainedBuffer: confirmed(usd('4500.00'), undefined, APPROVED_RISK),
+    dailyCashPayoutCap: confirmed(usd('3000.00'), undefined, APPROVED_RISK),
   },
   {
     key: 'SIM_300K',
     label: '$300,000',
     startingBalance: usd('300000.00'),
     listPrice: confirmed(usd('2499.00'), 'One-time purchase, not a subscription.', CONFIRMED_PRICE),
-    positionCeiling: unresolved(
+    positionCeiling: confirmed(
       { minis: 15, micros: 150 },
-      'Position ceiling for the $300,000 account was explicitly NOT finalized. ' +
-        'The 15/150 figure is an interpolation for development only.',
-      'Build prompt §2 — "Not finalized"',
+      undefined,
+      'Owner-approved 2026-09-19. Interpolated from the confirmed sizes, then confirmed as-is.',
     ),
-    drawdownAllowance: proposed(usd('6750.00'), undefined, PROPOSED_RISK),
-    dailyLossLimit: proposed(usd('2125.00'), undefined, PROPOSED_RISK),
-    retainedBuffer: proposed(usd('7500.00'), undefined, PROPOSED_RISK),
-    dailyCashPayoutCap: proposed(usd('4000.00'), undefined, PROPOSED_RISK),
+    drawdownAllowance: confirmed(usd('6750.00'), undefined, APPROVED_RISK),
+    dailyLossLimit: confirmed(usd('2125.00'), undefined, APPROVED_RISK),
+    retainedBuffer: confirmed(usd('7500.00'), undefined, APPROVED_RISK),
+    dailyCashPayoutCap: confirmed(usd('4000.00'), undefined, APPROVED_RISK),
   },
 ];
 

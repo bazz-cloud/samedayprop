@@ -326,17 +326,23 @@ describe('position exposure', () => {
 });
 
 describe('plan risk parameters carry their approval status', () => {
-  it('marks every risk parameter as unapproved for production', () => {
-    expect(plan.drawdownAllowance.status).toBe('PROPOSED');
-    expect(plan.dailyLossLimit.status).toBe('PROPOSED');
-    expect(plan.retainedBuffer.status).toBe('PROPOSED');
+  it('carries the owner-approved risk parameters as confirmed', () => {
+    expect(plan.drawdownAllowance.status).toBe('CONFIRMED');
+    expect(plan.dailyLossLimit.status).toBe('CONFIRMED');
+    expect(plan.retainedBuffer.status).toBe('CONFIRMED');
+    expect(plan.dailyCashPayoutCap.status).toBe('CONFIRMED');
+  });
+
+  it('leaves the derived controls proposed, since the owner approved commercial terms', () => {
+    // The trailing stop offset was introduced during implementation rather than
+    // supplied as a commercial term, so it is not covered by that approval.
     expect(TRAILING_STOP_OFFSET.status).toBe('PROPOSED');
   });
 
-  it('keeps the confirmed position ceilings confirmed', () => {
-    expect(getPlan('SIM_25K').positionCeiling.status).toBe('CONFIRMED');
-    expect(getPlan('SIM_150K').positionCeiling.status).toBe('CONFIRMED');
-    // The one the owner explicitly did not finalise stays unresolved.
-    expect(getPlan('SIM_300K').positionCeiling.status).toBe('UNRESOLVED');
+  it('confirms every position ceiling, including the $300K that was interpolated', () => {
+    for (const key of ['SIM_25K', 'SIM_150K', 'SIM_300K'] as const) {
+      expect(getPlan(key).positionCeiling.status).toBe('CONFIRMED');
+    }
+    expect(getPlan('SIM_300K').positionCeiling.value).toEqual({ minis: 15, micros: 150 });
   });
 });
