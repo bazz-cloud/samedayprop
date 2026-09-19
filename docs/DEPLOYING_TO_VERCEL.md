@@ -11,9 +11,17 @@ session, a payout request) would fail or silently vanish between requests.
 
 Create the database first:
 
-**Vercel dashboard → Storage → Create Database → Postgres (Neon)**, attach it to
-this project. Vercel injects `DATABASE_URL` automatically. Any other Postgres
-host works too — you just paste the connection string yourself.
+**Vercel dashboard → Storage → Create Database → Neon** (or Vercel Postgres),
+attach it to this project. Vercel injects `DATABASE_URL` automatically. Any
+other Postgres host works too — you just paste the connection string yourself.
+
+**Not Prisma Postgres.** The marketplace integration of that name sets
+`DATABASE_URL` to a `prisma+postgres://` Accelerate URL, which needs the
+Accelerate driver adapter this application does not use. The build rejects that
+URL rather than falling through to SQLite.
+
+If `DATABASE_URL` is missing or SQLite, the build fails on purpose. A warning
+would let a deployment go live that builds cleanly and then loses every write.
 
 The Prisma schema adapts on its own: `scripts/set-db-provider.mjs` reads the
 scheme of `DATABASE_URL` at build time and rewrites the datasource provider, so

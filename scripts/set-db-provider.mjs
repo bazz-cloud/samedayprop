@@ -16,6 +16,22 @@ import { readFile, writeFile } from 'node:fs/promises';
 const SCHEMA = 'prisma/schema.prisma';
 const url = process.env.DATABASE_URL ?? '';
 
+// Prisma Postgres (the Vercel marketplace integration) hands out a
+// `prisma+postgres://` Accelerate URL, not a TCP Postgres connection string.
+// It needs the Accelerate driver adapter, which this application does not use,
+// and it would otherwise fall through to sqlite here and produce a deployment
+// that builds cleanly and cannot write a single row.
+if (/^prisma\+postgres:\/\//i.test(url)) {
+  console.error(
+    '\n  DATABASE_URL is a Prisma Accelerate URL (prisma+postgres://).\n' +
+      '  This application connects over plain Postgres and has no Accelerate adapter,\n' +
+      '  so this URL cannot work. Use a database that gives a postgres:// connection\n' +
+      '  string (Neon and Vercel Postgres both do), or supply the direct connection\n' +
+      '  string from the Prisma console instead of the Accelerate one.\n',
+  );
+  process.exit(1);
+}
+
 const provider = /^postgres(ql)?:\/\//i.test(url)
   ? 'postgresql'
   : /^mysql:\/\//i.test(url)
@@ -35,10 +51,16 @@ if (updated === schema) {
   console.log(`prisma datasource provider set to ${provider} (from DATABASE_URL)`);
 }
 
+// A warning here would let the build succeed and the site go live unable to
+// persist anything: serverless filesystems are ephemeral and read-only at
+// runtime, so every order, session and payout request would vanish or error.
+// Better to fail the build while someone is watching it.
 if (provider === 'sqlite' && process.env.VERCEL) {
-  console.warn(
-    '\n  WARNING: building on Vercel with a SQLite DATABASE_URL.\n' +
-      '  Vercel filesystems are ephemeral and read-only at runtime, so writes will fail.\n' +
-      '  Set DATABASE_URL to a Postgres connection string.\n',
+  console.error(
+    `\n  Refusing to build on Vercel with ${url ? 'a SQLite' : 'no'} DATABASE_URL.\n` +
+      '  Serverless filesystems are ephemeral and read-only at runtime, so the deployment\n' +
+      '  would build cleanly and then fail every write.\n' +
+      '  Attach a Postgres database (Storage -> Neon or Vercel Postgres) and redeploy.\n',
   );
+  process.exit(1);
 }
