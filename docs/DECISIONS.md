@@ -41,6 +41,7 @@ These came directly from the brief and are treated as commitments.
 | Position ceilings | $25K: 2 minis / 20 micros. $50K: 4 / 40. $100K: 6 / 60. $150K: 10 / 100. |
 | Platform | Tradovate is the planned platform (capability verification is EXTERNAL). |
 | Checkout | Signed trader agreements required before payment and activation. |
+| Lifetime cash payout cap | Six times the account's daily cash payout cap. Reaching it ends the account; a reset does not restore capacity, so continuing means buying a new account. |
 
 ### Confirmed price table
 
@@ -51,6 +52,27 @@ These came directly from the brief and are treated as commitments.
 | $100,000 | $999.00 | $749.25 |
 | $150,000 | $1,499.00 | $1,124.25 |
 | $300,000 | $2,499.00 | $1,874.25 |
+
+### Lifetime cash payout caps
+
+Derived, not written down: `6 x daily cash payout cap`. The owner approved the
+multiple, so the two figures cannot drift apart in a hand-edited table.
+
+| Account | Daily cash cap | Lifetime cash cap |
+|---|---|---|
+| $25,000 | $1,000 | **$6,000** |
+| $50,000 | $1,500 | **$9,000** |
+| $100,000 | $2,500 | **$15,000** |
+| $150,000 | $3,000 | **$18,000** |
+| $300,000 | $4,000 | **$24,000** |
+
+The daily cash cap is CONFIRMED only for the $25,000 account; the other four are
+still PROPOSED, so those four lifetime caps inherit that status through their
+multiplicand and remain blocked from production sale on that basis.
+
+The `unresolved` branch of `LifetimeCapPolicy` is retained and still tested: a
+plan added later with no approved cap must keep failing closed rather than
+defaulting to uncapped.
 
 Asserted exactly in `tests/pricing.test.ts`.
 
@@ -99,22 +121,6 @@ Other proposed defaults:
 ---
 
 ## UNRESOLVED — the owner must decide
-
-### Lifetime cash payout caps — the largest open exposure
-
-Recommended but **explicitly NOT approved**: $1,500 / $3,000 / $5,000 / $6,000 /
-$10,000 for the five remaining sizes. (The $4,000 draft belonged to the $75,000
-account, which the owner has since withdrawn.)
-
-These are seeded as `kind: 'unresolved'` drafts. The type system makes it
-impossible to read a usable number out of an unresolved cap:
-`lifetimeCapAmountMinor()` throws rather than returning `null`, and
-`lifetimeCapForPayout()` throws in the service layer. A payout request on a plan
-with an undecided cap is refused with an explanation, not silently processed as
-uncapped.
-
-**The owner must either approve an amount per plan, or explicitly approve an
-uncapped policy with a written acknowledgement that the obligation is unbounded.**
 
 ### Position ceiling not finalised
 

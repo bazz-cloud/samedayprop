@@ -73,7 +73,8 @@ export type ResetRefusal =
   | 'ACCOUNT_PENDING'
   | 'PAYOUT_IN_FLIGHT'
   | 'DATA_STALE'
-  | 'NOT_FLAT';
+  | 'NOT_FLAT'
+  | 'LIFETIME_CAP_REACHED';
 
 export interface ResetEligibilityInput {
   /** ACTIVE | DAILY_PAUSED | BREACHED | SUSPENDED | CLOSED | PENDING */
@@ -82,6 +83,14 @@ export interface ResetEligibilityInput {
   readonly hasPayoutInFlight: boolean;
   readonly dataIsStale: boolean;
   readonly isFlat: boolean;
+  /**
+   * True once this account has paid out its whole lifetime cash capacity.
+   *
+   * A reset restores the balance but NOT consumed payout capacity, so a reset
+   * bought here would return an account that can trade and can never pay again.
+   * Selling that would be selling nothing.
+   */
+  readonly lifetimeCapReached: boolean;
 }
 
 export interface ResetEligibility {
@@ -136,6 +145,17 @@ export function checkResetEligibility(input: ResetEligibilityInput): ResetEligib
   }
   if (!input.isFlat) {
     return refuse('NOT_FLAT', 'Positions must be closed before this account can be reset.');
+  }
+
+  // Checked last, so a trader sees the ordinary blockers first and is not told
+  // to buy a new account when the real obstacle is an open position.
+  if (input.lifetimeCapReached) {
+    return refuse(
+      'LIFETIME_CAP_REACHED',
+      'This account has paid out its full lifetime cash limit. A reset restores the balance ' +
+        'but not payout capacity, so it would give you an account that can trade and can never ' +
+        'pay out. Buy a new account to keep earning.',
+    );
   }
 
   return { allowed: true, reason: null, message: null };

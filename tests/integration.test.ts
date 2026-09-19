@@ -239,7 +239,7 @@ describe('purchase to provisioning', () => {
       requirementStatuses: Record<string, string>;
     };
     expect(snapshot.rules.retainedBufferMinor).toBe('200000');
-    expect(snapshot.requirementStatuses.lifetimeCashCap).toBe('UNRESOLVED');
+    expect(snapshot.requirementStatuses.lifetimeCashCap).toBe('CONFIRMED');
   });
 
   it('is idempotent: the same key creates exactly one order', async () => {

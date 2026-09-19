@@ -197,7 +197,9 @@ function buildPlanView(plan: PlanDefinition): PlanView {
       detail: lifetimeCapBlocksProductionSale(plan.lifetimeCashCap)
         ? 'The owner has not decided whether this plan carries a lifetime cap. Accounts on ' +
           'this plan are not offered for sale until that decision is made and published.'
-        : describeLifetimeCap(plan.lifetimeCashCap),
+        : `${describeLifetimeCap(plan.lifetimeCashCap)} — six times this account's daily cash ` +
+          'cap. Once an account has paid out that much in total it is finished: a reset restores ' +
+          'the balance but not payout capacity, so continuing means buying a new account.',
       status: lifetimeCapBlocksProductionSale(plan.lifetimeCashCap) ? 'UNRESOLVED' : 'CONFIRMED',
     },
     {

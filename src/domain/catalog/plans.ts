@@ -99,18 +99,45 @@ export const MIN_POST_WITHDRAWAL_ROOM: Governed<Money> = proposed(
 const CONFIRMED_PRICE = 'Build prompt §2 confirmed price table';
 const PROPOSED_RISK = 'Build prompt §2 proposed defaults table — requires commercial approval';
 
-/** Recommended-but-explicitly-unapproved lifetime cash caps, seeded as drafts only. */
-function draftLifetimeCap(draft: string): LifetimeCapPolicy {
+/**
+ * Lifetime cash payout cap: six times the account's daily cash payout cap.
+ *
+ * The owner approved the MULTIPLE, not five separate figures, so the cap is
+ * derived rather than written down per plan. Change a daily cash cap and the
+ * lifetime cap follows it, which is the point: two numbers that are meant to
+ * stay in proportion cannot drift apart in a hand-edited table.
+ *
+ * Reaching the cap exhausts the account permanently. A reset does not restore
+ * consumed capacity — see `resetPreservesLifetimeCapacity` below — so the only
+ * way to keep earning is to buy a new account. That asymmetry is deliberate:
+ * if the cheapest reset in the catalog cleared the cap, per-customer exposure
+ * would be unbounded at reset prices.
+ */
+export const LIFETIME_CAP_MULTIPLE_OF_DAILY_CASH_CAP = 6n;
+
+const LIFETIME_CAP_APPROVAL = {
+  approvedBy: 'Owner',
+  approvedAt: '2026-09-19',
+} as const;
+
+function approvedLifetimeCap(dailyCashCap: Money): LifetimeCapPolicy {
   return {
-    kind: 'unresolved',
-    draftMinor: usd(draft).minor,
-    note:
-      `Recommended draft of $${draft} was NOT approved. The owner must choose an amount ` +
-      'or explicitly approve an uncapped policy. Production sale is blocked until then.',
+    kind: 'approved-amount',
+    amountMinor: dailyCashCap.timesInt(Number(LIFETIME_CAP_MULTIPLE_OF_DAILY_CASH_CAP)).minor,
+    ...LIFETIME_CAP_APPROVAL,
   };
 }
 
-export const PLANS: readonly PlanDefinition[] = [
+/**
+ * A reset restores balance, high-water mark and threshold. It does NOT restore
+ * consumed lifetime payout capacity. Stated here as a named constant because it
+ * is the load-bearing assumption behind the cap meaning anything at all.
+ */
+export const resetPreservesLifetimeCapacity = true;
+
+type PlanWithoutDerivedCap = Omit<PlanDefinition, 'lifetimeCashCap'>;
+
+const RAW_PLANS: readonly PlanWithoutDerivedCap[] = [
   {
     key: 'SIM_25K',
     label: '$25,000',
@@ -125,7 +152,6 @@ export const PLANS: readonly PlanDefinition[] = [
       'Starting daily cash payout cap of $1,000 (equivalent to $2,000 gross).',
       'Build prompt §2 confirmed',
     ),
-    lifetimeCashCap: draftLifetimeCap('1500.00'),
   },
   {
     key: 'SIM_50K',
@@ -137,7 +163,6 @@ export const PLANS: readonly PlanDefinition[] = [
     dailyLossLimit: proposed(usd('595.00'), undefined, PROPOSED_RISK),
     retainedBuffer: proposed(usd('2000.00'), undefined, PROPOSED_RISK),
     dailyCashPayoutCap: proposed(usd('1500.00'), undefined, PROPOSED_RISK),
-    lifetimeCashCap: draftLifetimeCap('3000.00'),
   },
   {
     key: 'SIM_100K',
@@ -149,7 +174,6 @@ export const PLANS: readonly PlanDefinition[] = [
     dailyLossLimit: proposed(usd('850.00'), undefined, PROPOSED_RISK),
     retainedBuffer: proposed(usd('3000.00'), undefined, PROPOSED_RISK),
     dailyCashPayoutCap: proposed(usd('2500.00'), undefined, PROPOSED_RISK),
-    lifetimeCashCap: draftLifetimeCap('5000.00'),
   },
   {
     key: 'SIM_150K',
@@ -161,7 +185,6 @@ export const PLANS: readonly PlanDefinition[] = [
     dailyLossLimit: proposed(usd('1275.00'), undefined, PROPOSED_RISK),
     retainedBuffer: proposed(usd('4500.00'), undefined, PROPOSED_RISK),
     dailyCashPayoutCap: proposed(usd('3000.00'), undefined, PROPOSED_RISK),
-    lifetimeCashCap: draftLifetimeCap('6000.00'),
   },
   {
     key: 'SIM_300K',
@@ -178,9 +201,18 @@ export const PLANS: readonly PlanDefinition[] = [
     dailyLossLimit: proposed(usd('2125.00'), undefined, PROPOSED_RISK),
     retainedBuffer: proposed(usd('7500.00'), undefined, PROPOSED_RISK),
     dailyCashPayoutCap: proposed(usd('4000.00'), undefined, PROPOSED_RISK),
-    lifetimeCashCap: draftLifetimeCap('10000.00'),
   },
 ];
+
+/**
+ * The cap is attached here rather than written into each plan above, so it is
+ * structurally impossible for a plan's lifetime cap to disagree with the daily
+ * cash cap it is defined as a multiple of.
+ */
+export const PLANS: readonly PlanDefinition[] = RAW_PLANS.map((plan) => ({
+  ...plan,
+  lifetimeCashCap: approvedLifetimeCap(plan.dailyCashPayoutCap.value),
+}));
 
 const PLANS_BY_KEY = new Map<PlanKey, PlanDefinition>(PLANS.map((p) => [p.key, p]));
 

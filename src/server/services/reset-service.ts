@@ -76,11 +76,28 @@ export async function getResetOffer(
     ? (JSON.parse(positions.positions) as { signedQuantity: number }[])
     : [];
 
+  // Whether this account still has lifetime payout capacity. A reset restores
+  // the balance but not consumed capacity, so an exhausted account must not be
+  // sold one — see checkResetEligibility.
+  const reservations = await prisma.payoutReservation.findMany({
+    where: { tradingAccountId, status: { in: ['ACTIVE', 'CONSUMED'] } },
+    select: { cashAmountMinor: true },
+  });
+  const lifetimeCommitted = reservations.reduce(
+    (total, r) => total.plus(Money.fromMinor(r.cashAmountMinor)),
+    Money.zero(),
+  );
+  const lifetimeCap = plan.lifetimeCashCap;
+  const lifetimeCapReached =
+    lifetimeCap.kind === 'approved-amount' &&
+    !lifetimeCommitted.lt(Money.fromMinor(lifetimeCap.amountMinor));
+
   const eligibility = checkResetEligibility({
     tradingStatus: account.tradingStatus,
     hasPayoutInFlight: inFlight > 0,
     dataIsStale: account.dataStale,
     isFlat: parsed.every((p) => p.signedQuantity === 0),
+    lifetimeCapReached,
   });
 
   return {

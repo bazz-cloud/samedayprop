@@ -232,9 +232,10 @@ export default function RulesPage() {
         </div>
         <p className="text-sm text-fg-subtle leading-relaxed">
           Prices and position ceilings for the $25,000, $50,000, $100,000 and $150,000 accounts are
-          confirmed. Every daily loss limit, drawdown allowance and buffer above is a proposed
-          development default. The $300,000 position ceiling and every lifetime payout
-          cap are undecided. Accounts are not sold for real money while these remain open.
+          confirmed, as is the lifetime payout cap on every account. Every daily loss limit,
+          drawdown allowance and buffer above is a proposed development default, and the $300,000
+          position ceiling is undecided. Accounts are not sold for real money while these remain
+          open.
         </p>
       </section>
 

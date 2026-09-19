@@ -4,6 +4,11 @@ import { allocateByWeight, allocateProportionally } from '@/domain/money/allocat
 import { PLANS, couponPrice, getPlan } from '@/domain/catalog/plans';
 import { buildQuote, canonicaliseQuote } from '@/domain/pricing/quote';
 import { DEFAULT_COUPON, normaliseCouponCode, validateCoupon } from '@/domain/pricing/coupon';
+import {
+  lifetimeCapAmountMinor,
+  lifetimeCapBlocksProductionSale,
+  type LifetimeCapPolicy,
+} from '@/domain/config/requirement-status';
 
 const coupon = DEFAULT_COUPON.value;
 
@@ -233,9 +238,23 @@ describe('production gating', () => {
     }
   });
 
-  it('names the unresolved lifetime cap as a blocker rather than defaulting to uncapped', () => {
+  it('no longer blocks on the lifetime cap, now that the owner has approved one', () => {
     const quote = buildQuote({ selection: { planKey: 'SIM_50K', addOnKeys: [], couponCode: null }, coupon: null });
-    expect(quote.productionBlockers.map((b) => b.code)).toContain('PLAN_LIFETIMECASHCAP_UNRESOLVED');
+    expect(quote.productionBlockers.map((b) => b.code)).not.toContain(
+      'PLAN_LIFETIMECASHCAP_UNRESOLVED',
+    );
+  });
+
+  it('still refuses to read a usable number out of an unresolved cap', () => {
+    // The guard that made the blocker above necessary has to keep working, or
+    // a future plan added with no approved cap would silently sell as uncapped.
+    const undecided: LifetimeCapPolicy = {
+      kind: 'unresolved',
+      draftMinor: usd('3000.00').minor,
+      note: 'not approved',
+    };
+    expect(lifetimeCapBlocksProductionSale(undecided)).toBe(true);
+    expect(() => lifetimeCapAmountMinor(undecided)).toThrow(/UNRESOLVED/);
   });
 
   it('blocks on unconfigured tax rather than assuming zero tax is correct', () => {

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { usd } from '@/domain/money/money';
-import { PLANS, TRAILING_STOP_OFFSET, getPlan } from '@/domain/catalog/plans';
+import {
+  LIFETIME_CAP_MULTIPLE_OF_DAILY_CASH_CAP,
+  PLANS,
+  TRAILING_STOP_OFFSET,
+  getPlan,
+} from '@/domain/catalog/plans';
+import {
+  lifetimeCapAmountMinor,
+  lifetimeCapBlocksProductionSale,
+} from '@/domain/config/requirement-status';
 import {
   RESET_DISCOUNT,
   checkResetEligibility,
@@ -16,6 +25,7 @@ const healthy: ResetEligibilityInput = {
   hasPayoutInFlight: false,
   dataIsStale: false,
   isFlat: true,
+  lifetimeCapReached: false,
 };
 
 describe('reset pricing', () => {
@@ -109,5 +119,54 @@ describe('reset restores the starting position', () => {
       const fresh = plan.startingBalance.minus(plan.drawdownAllowance.value);
       expect(state.restoredThreshold.equals(fresh)).toBe(true);
     }
+  });
+});
+
+describe('lifetime cash payout cap', () => {
+  it('is exactly six times the account\'s own daily cash cap', () => {
+    for (const plan of PLANS) {
+      expect(plan.lifetimeCashCap.kind).toBe('approved-amount');
+      if (plan.lifetimeCashCap.kind !== 'approved-amount') throw new Error('unreachable');
+      const expected =
+        plan.dailyCashPayoutCap.value.minor * LIFETIME_CAP_MULTIPLE_OF_DAILY_CASH_CAP;
+      expect(plan.lifetimeCashCap.amountMinor).toBe(expected);
+    }
+  });
+
+  it('resolves every plan, so no plan is blocked from sale by an undecided cap', () => {
+    for (const plan of PLANS) {
+      expect(lifetimeCapBlocksProductionSale(plan.lifetimeCashCap)).toBe(false);
+      expect(lifetimeCapAmountMinor(plan.lifetimeCashCap)).toBeGreaterThan(0n);
+    }
+  });
+
+  it('caps the $25K account at $6,000 and the $300K at $24,000', () => {
+    const cap = (key: Parameters<typeof getPlan>[0]) => {
+      const policy = getPlan(key).lifetimeCashCap;
+      if (policy.kind !== 'approved-amount') throw new Error('expected an approved amount');
+      return policy.amountMinor;
+    };
+    expect(cap('SIM_25K')).toBe(usd('6000.00').minor);
+    expect(cap('SIM_300K')).toBe(usd('24000.00').minor);
+  });
+});
+
+describe('reset once the lifetime cap is reached', () => {
+  it('is refused, because a reset restores balance but not payout capacity', () => {
+    const result = checkResetEligibility({ ...healthy, lifetimeCapReached: true });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe('LIFETIME_CAP_REACHED');
+    expect(result.message).toMatch(/[Bb]uy a new account/);
+  });
+
+  it('reports the ordinary blocker first when both apply', () => {
+    // Telling someone to buy a new account when they simply have a position
+    // open would be both wrong and expensive for them.
+    const result = checkResetEligibility({
+      ...healthy,
+      isFlat: false,
+      lifetimeCapReached: true,
+    });
+    expect(result.reason).toBe('NOT_FLAT');
   });
 });

@@ -15,6 +15,8 @@
  * See docs/DECISIONS.md for the authoritative register.
  */
 
+import { Money } from '@/domain/money/money';
+
 export type RequirementStatus = 'CONFIRMED' | 'PROPOSED' | 'EXTERNAL' | 'UNRESOLVED';
 
 export interface Governed<T> {
@@ -101,7 +103,7 @@ export function lifetimeCapBlocksProductionSale(policy: LifetimeCapPolicy): bool
 export function describeLifetimeCap(policy: LifetimeCapPolicy): string {
   switch (policy.kind) {
     case 'approved-amount':
-      return `Lifetime cash payout cap of ${(Number(policy.amountMinor) / 100).toFixed(2)} USD`;
+      return `${Money.fromMinor(policy.amountMinor).format()} lifetime cash payout cap`;
     case 'approved-uncapped':
       return 'No lifetime cash payout cap (explicitly approved)';
     case 'unresolved':
