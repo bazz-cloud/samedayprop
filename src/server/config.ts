@@ -47,6 +47,12 @@ export interface ProviderConfig {
     readonly marketDataUrl: string | null;
     /** Organization id issued with the API key. Required on every call. */
     readonly cid: string | null;
+    /**
+     * Settings still absent, by name. Empty when the adapter can be used.
+     * The API SECRET is never held on this object — only its absence is
+     * reported here, so the checklist can be accurate without carrying it.
+     */
+    readonly missing: readonly string[];
   };
   readonly email: {
     readonly driver: 'local-outbox' | 'smtp';
@@ -173,6 +179,22 @@ function readTradovateEnvironment(): 'STAGING' | 'PRODUCTION' | null {
   return null;
 }
 
+/**
+ * Which Tradovate settings are absent.
+ *
+ * Returned as a list rather than a boolean so the setup checklist can name the
+ * missing one. "Trading provider not configured" sends someone hunting; "no
+ * TRADOVATE_API_SECRET" does not.
+ */
+function missingTradovateSettings(environment: 'STAGING' | 'PRODUCTION' | null): string[] {
+  const missing: string[] = [];
+  if (!environment) missing.push('TRADOVATE_ENVIRONMENT');
+  if (!env('TRADOVATE_API_KEY')) missing.push('TRADOVATE_API_KEY');
+  if (!env('TRADOVATE_API_SECRET')) missing.push('TRADOVATE_API_SECRET');
+  if (!env('TRADOVATE_CID')) missing.push('TRADOVATE_CID');
+  return missing;
+}
+
 function tradovateHost(
   environment: 'STAGING' | 'PRODUCTION' | null,
   which: 'sim' | 'md',
@@ -187,14 +209,18 @@ export function getConfig(): AppConfig {
 
   const mode = readMode();
   const paymentsConfigured = Boolean(env('PAYMENTS_PUBLIC_KEY') && env('PAYMENTS_SECRET_KEY'));
-  // All three are required together: Tradovate's own documentation says access
-  // needs organization admin credentials, an API key AND a CID. Two out of
-  // three is not a usable configuration, so it counts as unconfigured and the
-  // mock stays in place rather than a half-configured adapter failing later.
+  // Tradovate needs an API key AND a secret (created together in Dashboards),
+  // a CID, and an environment. A partial set is not a usable configuration, so
+  // it counts as unconfigured and the mock stays in place rather than a
+  // half-configured adapter failing on the first real customer.
+  //
+  // The SECRET is deliberately not read into AppConfig below. Config objects
+  // get passed around, logged and occasionally serialised into a page; a
+  // credential that can sign requests should live in process.env and be read
+  // only at the point of use.
   const tradovateEnvironment = readTradovateEnvironment();
-  const tradingConfigured = Boolean(
-    env('TRADOVATE_API_KEY') && env('TRADOVATE_CID') && tradovateEnvironment,
-  );
+  const tradovateMissing = missingTradovateSettings(tradovateEnvironment);
+  const tradingConfigured = tradovateMissing.length === 0;
   const emailConfigured = Boolean(env('SMTP_URL'));
 
   const providers: ProviderConfig = {
@@ -210,6 +236,7 @@ export function getConfig(): AppConfig {
       simBaseUrl: tradovateHost(tradovateEnvironment, 'sim'),
       marketDataUrl: tradovateHost(tradovateEnvironment, 'md'),
       cid: env('TRADOVATE_CID') ?? null,
+      missing: tradovateMissing,
     },
     email: {
       driver: emailConfigured ? 'smtp' : 'local-outbox',

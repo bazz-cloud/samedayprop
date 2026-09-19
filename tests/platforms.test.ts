@@ -43,12 +43,36 @@ describe('platform catalog', () => {
 });
 
 describe('Tradovate configuration', () => {
-  it('refuses to construct without all three of base URL, API key and CID', () => {
-    // Tradovate's documentation requires organization admin credentials, an API
-    // key and a CID together. Failing at construction beats a confusing 401 on
+  it('refuses to construct without the key, the secret and the CID', () => {
+    // Tradovate issues a key AND a secret from Dashboards, and the CID comes
+    // with partner access. Failing at construction beats a confusing 401 on
     // the first real call.
-    expect(() => new TradovateProvider('SANDBOX', 'https://x.invalid', 'key', '')).toThrow(/CID/);
-    expect(() => new TradovateProvider('SANDBOX', '', 'key', 'cid')).toThrow();
+    expect(
+      () => new TradovateProvider('SANDBOX', 'https://x.invalid', 'key', 'secret', ''),
+    ).toThrow(/CID/);
+    expect(
+      () => new TradovateProvider('SANDBOX', 'https://x.invalid', 'key', '', 'cid'),
+    ).toThrow(/API secret/);
+    expect(() => new TradovateProvider('SANDBOX', '', 'key', 'secret', 'cid')).toThrow(/base URL/);
+  });
+
+  it('never puts the API secret VALUE on the config object', () => {
+    // Config gets passed into views, logged, and occasionally serialised into a
+    // page, so a credential that can sign requests is read at the point of use
+    // instead. Checked against the source rather than a resolved config,
+    // because in tests the variable is unset and any value assertion would
+    // pass vacuously.
+    //
+    // The NAME is allowed to appear — the setup checklist reports which
+    // settings are missing, and naming them is the whole point of it.
+    const source = readFileSync(join(__dirname, '..', 'src/server/config.ts'), 'utf8');
+    const reads = source.match(/env\('TRADOVATE_API_SECRET'\)/g) ?? [];
+    expect(reads).toHaveLength(1);
+    expect(source).toMatch(/if \(!env\('TRADOVATE_API_SECRET'\)\) missing\.push/);
+
+    // And the adapter gets it straight from the environment.
+    const registry = readFileSync(join(__dirname, '..', 'src/server/providers/registry.ts'), 'utf8');
+    expect(registry).toContain('process.env.TRADOVATE_API_SECRET');
   });
 });
 
@@ -60,6 +84,7 @@ describe('neither adapter pretends', () => {
       'SANDBOX',
       'https://demo-api.staging.ninjatrader.dev',
       'key',
+      'secret',
       'cid',
     );
     await expect(

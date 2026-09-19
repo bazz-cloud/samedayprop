@@ -78,6 +78,9 @@ export function getTradingProvider(platform: PlatformKey = DEFAULT_PLATFORM): Tr
     config.providers.trading.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX',
     config.providers.trading.simBaseUrl!,
     process.env.TRADOVATE_API_KEY!,
+    // Read here rather than from config: a credential that can sign requests
+    // does not belong on an object that gets passed around and logged.
+    process.env.TRADOVATE_API_SECRET!,
     config.providers.trading.cid!,
   );
   return tradingProvider;

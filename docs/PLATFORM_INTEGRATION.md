@@ -18,9 +18,32 @@ and the timeline are different by an order of magnitude.
 Read from the Tradovate Partner API introduction, 2026-09-19. These are the
 vendor's statements, not results of calls we have made.
 
-**Access needs three things together**, issued by an Evaluation Support
-representative: **organization admin credentials**, an **API key**, and a
-**CID** (organization id).
+### Getting access, in order
+
+This is the part nobody can do from inside a codebase, and step 1 gates
+everything else.
+
+| # | Step | Who |
+|---|---|---|
+| 1 | **Partner account access to the Tradovate Dashboards.** Requested from an Evaluation Support representative. | Owner |
+| 2 | **Create API credentials — a key AND a secret — inside Dashboards.** They are generated there, not handed over. | Owner |
+| 3 | Note the **CID** (organization id) that comes with partner access. | Owner |
+| 4 | Set `TRADOVATE_ENVIRONMENT`, `TRADOVATE_API_KEY`, `TRADOVATE_API_SECRET`, `TRADOVATE_CID`. | Owner |
+| 5 | Write the calls: token exchange, create user, create simulation account, apply and read back risk, WebSocket subscription. | Engineering |
+| 6 | Conformance testing, beginning with authentication. | Both |
+| 7 | Production key, beta tested at least a week before real orders. | Both |
+
+Tradovate also lists a development environment and an HTTP client as
+prerequisites. Both already exist here — this is a Node application with an
+HTTP client — so they need nothing from you.
+
+A partial credential set is treated as **unconfigured**: the mock provider stays
+in place and `getConfig().providers.trading.missing` names exactly which
+variables are absent, rather than a bare "not configured" that sends someone
+hunting. The **secret never lands on the config object** — only the fact of its
+absence does — because config is passed into views, logged, and occasionally
+serialised into a page. The adapter reads it from the environment at the point
+of use.
 
 **Hosts — the two we use, and only those.**
 
