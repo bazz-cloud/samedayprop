@@ -21,6 +21,7 @@ import {
   exposureRatio,
   firmExposure,
   remainingLifetimeCap,
+  checkLifetimeCapReached,
 } from '@/domain/analytics/exposure';
 import {
   buildClusters,
@@ -418,5 +419,63 @@ describe('owner signals', () => {
     expect(
       normaliseAddress({ addressLine1: null, postalCode: null, countryCode: null }),
     ).toBeNull();
+  });
+});
+
+describe('lifetime cap completion', () => {
+  const cap = 600_000n; // $6,000 on the $25K account
+
+  it('is not complete while capacity remains', () => {
+    const result = checkLifetimeCapReached({
+      lifetimeCapMinor: cap,
+      reservedMinor: 0n,
+      consumedMinor: 500_000n,
+    });
+    expect(result.complete).toBe(false);
+    expect(result.reason).toBeNull();
+  });
+
+  it('completes exactly at the cap, not only past it', () => {
+    const result = checkLifetimeCapReached({
+      lifetimeCapMinor: cap,
+      reservedMinor: 0n,
+      consumedMinor: cap,
+    });
+    expect(result.complete).toBe(true);
+    expect(result.reason).toBe('LIFETIME_CAP_REACHED');
+  });
+
+  it('counts reserved capacity, so an in-flight request completes the account', () => {
+    // Otherwise the trader could open a position for money that can never be
+    // paid, because the last request has already claimed the remainder.
+    const result = checkLifetimeCapReached({
+      lifetimeCapMinor: cap,
+      reservedMinor: 100_000n,
+      consumedMinor: 500_000n,
+    });
+    expect(result.complete).toBe(true);
+  });
+
+  it('never completes an approved uncapped account', () => {
+    // No amount exhausts an unbounded policy.
+    expect(
+      checkLifetimeCapReached({
+        lifetimeCapMinor: null,
+        reservedMinor: 0n,
+        consumedMinor: 99_999_999n,
+      }).complete,
+    ).toBe(false);
+  });
+
+  it('explains it as a completion and points at a new account, not a reset', () => {
+    const message = checkLifetimeCapReached({
+      lifetimeCapMinor: cap,
+      reservedMinor: 0n,
+      consumedMinor: cap,
+    }).message!;
+    expect(message).toContain('complete');
+    expect(message).toContain('buying a new account');
+    // A reset must not read as the way back, because it restores no capacity.
+    expect(message).toContain('not payout capacity');
   });
 });

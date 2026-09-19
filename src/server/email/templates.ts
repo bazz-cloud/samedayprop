@@ -354,6 +354,55 @@ export function resetPurchased(input: {
   ]);
 }
 
+// ---------------------------------------------------------------------------
+// 9 · Lifetime cap reached
+// ---------------------------------------------------------------------------
+
+export function lifetimeCapReached(input: {
+  company: Company;
+  to: string;
+  name: string;
+  planLabel: string;
+  lifetimeCap: string;
+  totalPaid: string;
+  newAccountPrice: string;
+}): OutgoingEmail {
+  return compose(
+    input.company,
+    input.to,
+    `Your ${input.planLabel} account is complete — ${input.totalPaid} paid`,
+    [
+      `${input.name},`,
+      '',
+      // Deliberately congratulatory. This is the opposite of a breach: the
+      // trader earned everything the account could ever pay. Wording it like a
+      // termination turns a success into a grievance.
+      `You have been paid the full lifetime limit on your ${input.planLabel} account.`,
+      '',
+      `Lifetime limit: ${input.lifetimeCap}`,
+      `Paid to you:    ${input.totalPaid}`,
+      '',
+      'That account is now complete and closed for trading. Nothing went wrong and',
+      'nothing was forfeited — you reached the ceiling the account was sold with.',
+      '',
+      'We closed it rather than leaving it open because it has no payout capacity',
+      'left. Trading on for a withdrawal that cannot be approved would waste your',
+      'time.',
+      '',
+      `To keep trading, buy a new account. A new ${input.planLabel} account is`,
+      `${input.newAccountPrice} and starts with its full lifetime limit again.`,
+      '',
+      // Said plainly here because this is the moment people try it.
+      'A reset will not reopen this one. A reset restores the balance, not the',
+      'payout capacity you have already used, so it would return an account that',
+      'can trade and can never pay out. We do not sell resets on completed',
+      'accounts.',
+      '',
+      `${input.company.baseUrl}/accounts`,
+    ],
+  );
+}
+
 /** Every template, for the review document and for tests. */
 export const TEMPLATE_NAMES = [
   'accountPurchased',
@@ -364,4 +413,5 @@ export const TEMPLATE_NAMES = [
   'payoutPaid',
   'inactivityWarning',
   'resetPurchased',
+  'lifetimeCapReached',
 ] as const;

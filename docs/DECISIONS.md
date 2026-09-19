@@ -41,7 +41,7 @@ These came directly from the brief and are treated as commitments.
 | Position ceilings | $25K: 2 minis / 20 micros. $50K: 4 / 40. $100K: 6 / 60. $150K: 10 / 100. |
 | Platform | Tradovate is the planned platform (capability verification is EXTERNAL). |
 | Checkout | Signed trader agreements required before payment and activation. |
-| Lifetime cash payout cap | Six times the account's daily cash payout cap. Reaching it ends the account; a reset does not restore capacity, so continuing means buying a new account. |
+| Lifetime cash payout cap | Six times the account's daily cash payout cap. Reaching it CLOSES the account automatically — a completion, not a breach. A reset does not restore capacity, so continuing means buying a new account. |
 
 ### Confirmed price table
 

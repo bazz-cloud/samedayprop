@@ -135,6 +135,28 @@ export default function RulesPage() {
             'Eligibility, processing and settlement are three different things. We do not guarantee same-day receipt of funds in your bank account, and you should be sceptical of anyone who does.',
         },
         {
+          id: 'lifetime-cap',
+          title: 'Lifetime payout cap',
+          summary: 'Reach the cap and the account is complete. It closes.',
+          body: [
+            'Each account has a total amount of cash it will ever pay you, equal to six times its daily cash cap. Once you have been paid that, the account has done everything it was sold to do.',
+            'It closes automatically at that point. We close it rather than leaving it open because it has no payout capacity left, and trading on for a withdrawal that cannot be approved would waste your time.',
+            'To keep trading, buy a new account. It starts with its full lifetime limit again.',
+          ],
+          table: {
+            columns: ['Account', 'Daily cash cap', 'Lifetime cap', 'New account'],
+            rows: tierRows((plan) => [
+              plan.dailyCashCap.display,
+              plan.lifetimeCapResolved
+                ? (plan.lifetimeCapDescription.split(' ')[0] ?? '—')
+                : 'Not decided',
+              plan.couponPrice.display,
+            ]),
+          },
+          caveat:
+            'This is not a breach and nothing is forfeited — it is the ceiling the account was sold with. A reset will not reopen a completed account: a reset restores the balance, not the payout capacity you have already used, so it would return an account that can trade and can never pay out. We do not sell resets on completed accounts.',
+        },
+        {
           id: 'resets',
           title: 'Resets',
           summary: 'Breached an account? Reset it for $10 less than a new one.',
@@ -190,6 +212,13 @@ export default function RulesPage() {
         </div>
         <p className="no-caps text-xs text-fg-fine">
           A breach ends trading on that account. The fee is not refunded.
+        </p>
+        <p className="no-caps text-sm text-fg-muted">
+          An account also closes when it reaches its lifetime payout cap — but that is a
+          completion, not a breach. You will have been paid everything that account could pay.{' '}
+          <a href="#lifetime-cap" className="text-accent hover:underline">
+            How the cap works
+          </a>
         </p>
       </section>
 

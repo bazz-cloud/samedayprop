@@ -24,6 +24,7 @@ export interface CalculatorPlan {
   readonly firstWithdrawalGross: string;
   readonly firstWithdrawalCash: string;
   readonly firstWithdrawalLeaves: string;
+  readonly lifetimeCap: string | null;
 }
 
 export function WithdrawalCalculator({
@@ -87,6 +88,12 @@ export function WithdrawalCalculator({
           The other {plan.firstWithdrawalCash} is not paid to anyone — it is simulated balance that
           ceases to exist. First withdrawal unlocks at{' '}
           <span className="tnum">{plan.firstWithdrawalAt}</span>.
+          {plan.lifetimeCap && (
+            <>
+              {' '}This account pays out up to <span className="tnum">{plan.lifetimeCap}</span> in
+              total, then closes as complete.
+            </>
+          )}
         </p>
 
         <Link

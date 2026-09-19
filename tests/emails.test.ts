@@ -40,6 +40,10 @@ const all = () => [
     ...base, planLabel: '$50,000', amountPaid: '$439.25',
     restoredBalance: '$50,000.00', remainingLifetimeCap: '$8,750.00',
   }),
+  templates.lifetimeCapReached({
+    ...base, planLabel: '$50,000', lifetimeCap: '$9,000.00',
+    totalPaid: '$9,000.00', newAccountPrice: '$449.25',
+  }),
 ];
 
 describe('every template', () => {
@@ -192,5 +196,30 @@ describe('reset email', () => {
       restoredBalance: '$50,000.00', remainingLifetimeCap: '$8,750.00',
     });
     expect(email.bodyText).toMatch(/was NOT restored/);
+  });
+});
+
+describe('lifetime cap email', () => {
+  const email = templates.lifetimeCapReached({
+    ...base, planLabel: '$50,000', lifetimeCap: '$9,000.00',
+    totalPaid: '$9,000.00', newAccountPrice: '$449.25',
+  });
+
+  it('reads as a completion, not a breach', () => {
+    expect(email.bodyText).toContain('complete');
+    expect(email.bodyText).toContain('Nothing went wrong');
+    // The words used for a drawdown breach must not appear here.
+    expect(email.bodyText).not.toMatch(/breach|violat|forfeit(?!ed)/i);
+  });
+
+  it('says the account is closed and why', () => {
+    expect(email.bodyText).toContain('closed for trading');
+    expect(email.bodyText).toContain('no payout capacity');
+  });
+
+  it('points at a new account and rules out a reset', () => {
+    expect(email.bodyText).toContain('buy a new account');
+    expect(email.bodyText).toContain('A reset will not reopen this one');
+    expect(email.bodyText).toContain('do not sell resets on completed');
   });
 });

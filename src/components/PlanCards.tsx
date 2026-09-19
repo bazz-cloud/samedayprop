@@ -76,6 +76,14 @@ export function PlanCards({ plans }: { plans: readonly PlanView[] }) {
                 <Row label="Daily loss limit" value={plan.dailyLossLimit.display} />
                 <Row label="First payout at" value={plan.firstWithdrawalAt.display} />
                 <Row label="Daily payout cap" value={plan.dailyCashCap.display} />
+                <Row
+                  label="Lifetime payout cap"
+                  value={
+                    plan.lifetimeCapResolved
+                      ? (plan.lifetimeCapDescription.split(' ')[0] ?? '—')
+                      : 'Not decided'
+                  }
+                />
               </dl>
 
               <Link
@@ -147,10 +155,16 @@ export function PricingFootnotes({ fiftyK }: { fiftyK: PlanView }) {
       </div>
 
       <div className="rounded-xl border border-border-strong bg-card p-5">
-        <p className="label">Nothing renews, ever</p>
+        <p className="label">The account has a finish line</p>
         <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
-          You pay once. Firms that bill monthly keep charging until you cancel, so the honest
-          comparison is over a whole run rather than at signup.
+          Each account pays out up to{' '}
+          <span className="tnum">
+            {fiftyK.lifetimeCapResolved
+              ? (fiftyK.lifetimeCapDescription.split(' ')[0] ?? '')
+              : ''}
+          </span>{' '}
+          in total. Reach it and the account closes as complete — not a breach, nothing forfeited.
+          Keep trading by buying a new one. A reset does not reopen it.
         </p>
       </div>
     </div>

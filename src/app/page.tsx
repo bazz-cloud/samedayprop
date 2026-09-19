@@ -30,6 +30,9 @@ export default function HomePage() {
     firstWithdrawalGross: plan.firstWithdrawalGross.display,
     firstWithdrawalCash: plan.firstWithdrawalCash.display,
     firstWithdrawalLeaves: plan.firstWithdrawalLeaves.display,
+    lifetimeCap: plan.lifetimeCapResolved
+      ? (plan.lifetimeCapDescription.split(' ')[0] ?? null)
+      : null,
   }));
 
   return (

@@ -78,6 +78,12 @@ Not your to-do list — mine, or things that need a migration you should approve
 - **No IP address or device fingerprint** on orders or sessions. These are the
   two strongest same-owner signals, and their absence is why correlated-account
   detection is weaker than it should be. Needs a migration.
+- **Catalog revisions must run on deploy.** `publishCatalogIfEmpty` skips a plan
+  that already has a published version, so approving a cap or moving a risk
+  figure in `plans.ts` never reached the database. `publishCatalogRevisions()`
+  now publishes a new version when terms change and supersedes the old one;
+  it runs in `vercel-build` and in the seed. If you change a commercial term,
+  check the deploy log says it published a revision.
 - **Seeded orders never post to the revenue ledger**, so firm net position reads
   $0 against $8,000 of paid orders. The admin console reports both sources and
   flags the disagreement rather than hiding it. Revenue posting belongs in

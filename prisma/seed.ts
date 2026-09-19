@@ -718,9 +718,22 @@ async function main() {
 
   const password = await seedUsers();
 
-  const { publishCatalogIfEmpty } = await import('../src/server/services/catalog-service');
+  const { publishCatalogIfEmpty, publishCatalogRevisions } = await import(
+    '../src/server/services/catalog-service'
+  );
   const published = await publishCatalogIfEmpty();
   console.log(`Published ${published.plans} plan versions and ${published.addons} add-on versions.`);
+
+  // Terms changed in code since the catalog was first published get a NEW
+  // version. Without this, approving a cap or moving a risk figure in plans.ts
+  // never reaches the database and the payout engine keeps reading the old one.
+  const revisions = await publishCatalogRevisions();
+  if (revisions.length > 0) {
+    console.log(`Published ${revisions.length} plan revisions:`);
+    for (const r of revisions) {
+      console.log(`  ${r.planKey}: v${r.fromVersion} -> v${r.toVersion}`);
+    }
+  }
 
   await seedCatalogAndPolicies();
   console.log(`Seeded coupon, ${LEGAL_DOCUMENT_DRAFTS.length} legal drafts, ${PRODUCTS.length} instruments, 3 service slots.`);

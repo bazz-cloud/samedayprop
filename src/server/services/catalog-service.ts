@@ -153,6 +153,131 @@ export async function publishCatalogIfEmpty(): Promise<{ plans: number; addons: 
   return { plans, addons };
 }
 
+/**
+ * The terms that define a plan version, for comparison.
+ *
+ * Anything a customer is sold on. Presentation-only fields are excluded: a
+ * reworded label should not create a new contract version.
+ */
+function termsFingerprint(plan: PlanDefinition): string {
+  const caps = lifetimeCapColumns(plan);
+  return JSON.stringify({
+    startingBalanceMinor: plan.startingBalance.minor.toString(),
+    listPriceMinor: plan.listPrice.value.minor.toString(),
+    ceilingMinis: plan.positionCeiling.value.minis,
+    ceilingMicros: plan.positionCeiling.value.micros,
+    drawdownAllowanceMinor: plan.drawdownAllowance.value.minor.toString(),
+    dailyLossLimitMinor: plan.dailyLossLimit.value.minor.toString(),
+    retainedBufferMinor: plan.retainedBuffer.value.minor.toString(),
+    dailyCashCapMinor: plan.dailyCashPayoutCap.value.minor.toString(),
+    trailingStopOffsetMinor: TRAILING_STOP_OFFSET.value.minor.toString(),
+    lifetimeCapKind: caps.lifetimeCapKind,
+    lifetimeCapMinor: caps.lifetimeCapMinor?.toString() ?? null,
+    requirementStatuses: requirementStatusMap(plan),
+  });
+}
+
+function fingerprintOf(row: {
+  startingBalanceMinor: bigint;
+  listPriceMinor: bigint;
+  ceilingMinis: number;
+  ceilingMicros: number;
+  drawdownAllowanceMinor: bigint;
+  dailyLossLimitMinor: bigint;
+  retainedBufferMinor: bigint;
+  dailyCashCapMinor: bigint;
+  trailingStopOffsetMinor: bigint;
+  lifetimeCapKind: string;
+  lifetimeCapMinor: bigint | null;
+  requirementStatuses: string;
+}): string {
+  return JSON.stringify({
+    startingBalanceMinor: row.startingBalanceMinor.toString(),
+    listPriceMinor: row.listPriceMinor.toString(),
+    ceilingMinis: row.ceilingMinis,
+    ceilingMicros: row.ceilingMicros,
+    drawdownAllowanceMinor: row.drawdownAllowanceMinor.toString(),
+    dailyLossLimitMinor: row.dailyLossLimitMinor.toString(),
+    retainedBufferMinor: row.retainedBufferMinor.toString(),
+    dailyCashCapMinor: row.dailyCashCapMinor.toString(),
+    trailingStopOffsetMinor: row.trailingStopOffsetMinor.toString(),
+    lifetimeCapKind: row.lifetimeCapKind,
+    lifetimeCapMinor: row.lifetimeCapMinor?.toString() ?? null,
+    requirementStatuses: JSON.parse(row.requirementStatuses) as unknown,
+  });
+}
+
+export interface CatalogRevision {
+  readonly planKey: string;
+  readonly fromVersion: number;
+  readonly toVersion: number;
+}
+
+/**
+ * Publish a new version of any plan whose terms have changed in code.
+ *
+ * `publishCatalogIfEmpty` deliberately skips a plan that already has a
+ * published version, which meant approving a cap or changing a risk figure in
+ * `plans.ts` never reached the database. Accounts kept selling on the old terms
+ * and the payout engine kept reading an UNRESOLVED cap.
+ *
+ * The old version is SUPERSEDED, never edited or deleted. Orders point at the
+ * version they were sold under, so a customer's contract cannot be rewritten
+ * after the fact — which is the whole reason plan terms are versioned rather
+ * than stored as current values.
+ *
+ * Returns what changed, so a deploy can log it and an operator can see that a
+ * commercial term moved.
+ */
+export async function publishCatalogRevisions(): Promise<readonly CatalogRevision[]> {
+  const revisions: CatalogRevision[] = [];
+
+  for (const plan of PLANS) {
+    const current = await prisma.planVersion.findFirst({
+      where: { planKey: plan.key, status: 'PUBLISHED' },
+      orderBy: { version: 'desc' },
+    });
+    if (!current) continue; // publishCatalogIfEmpty handles a first publish.
+    if (fingerprintOf(current) === termsFingerprint(plan)) continue;
+
+    const blockers = planLaunchBlockers(plan);
+    const nextVersion = current.version + 1;
+
+    await prisma.$transaction([
+      prisma.planVersion.update({
+        where: { id: current.id },
+        data: { status: 'SUPERSEDED' },
+      }),
+      prisma.planVersion.create({
+        data: {
+          planKey: plan.key,
+          version: nextVersion,
+          status: 'PUBLISHED',
+          label: plan.label,
+          startingBalanceMinor: plan.startingBalance.minor,
+          listPriceMinor: plan.listPrice.value.minor,
+          ceilingMinis: plan.positionCeiling.value.minis,
+          ceilingMicros: plan.positionCeiling.value.micros,
+          drawdownAllowanceMinor: plan.drawdownAllowance.value.minor,
+          dailyLossLimitMinor: plan.dailyLossLimit.value.minor,
+          retainedBufferMinor: plan.retainedBuffer.value.minor,
+          dailyCashCapMinor: plan.dailyCashPayoutCap.value.minor,
+          trailingStopOffsetMinor: TRAILING_STOP_OFFSET.value.minor,
+          ...lifetimeCapColumns(plan),
+          requirementStatuses: JSON.stringify(requirementStatusMap(plan)),
+          launchBlockers: JSON.stringify(blockers),
+          sellableInProduction: blockers.length === 0,
+          publishedAt: new Date(),
+        },
+      }),
+    ]);
+
+    revisions.push({ planKey: plan.key, fromVersion: current.version, toVersion: nextVersion });
+  }
+
+  return revisions;
+}
+
 export async function getPublishedPlanVersion(planKey: PlanKey) {
   const version = await prisma.planVersion.findFirst({
     where: { planKey, status: 'PUBLISHED' },

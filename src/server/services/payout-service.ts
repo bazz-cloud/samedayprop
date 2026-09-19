@@ -39,6 +39,7 @@ import { DEFAULT_SESSION_CONFIG, lockoutHasLifted, sessionDateFor } from '@/doma
 import { buildObligationEntry, buildPayoutEntries } from '@/domain/ledger/entries';
 import { lifetimeCapForPayout, toRuleSnapshot } from './catalog-service';
 import { checkPayoutProfile } from '@/domain/customer/profile';
+import { checkLifetimeCapReached } from '@/domain/analytics/exposure';
 import { postEntries, postEntry } from './ledger-service';
 import { recordAudit } from './audit-service';
 import { getTradingProvider } from '@/server/providers/registry';
@@ -572,6 +573,94 @@ export async function markPayoutPaid(input: {
     entityId: input.payoutRequestId,
     after: { paymentRef: input.paymentRef },
   });
+
+  await closeIfLifetimeCapReached(request.tradingAccountId, input.actor);
+}
+
+/**
+ * Close an account that has now been paid its whole lifetime cap.
+ *
+ * Runs AFTER the payment is recorded, not inside that transaction. The payment
+ * is the fact that matters and must not be rolled back because a follow-up
+ * status change failed; if this does fail, the account is left open with no
+ * capacity, which the payout gate already refuses — a safe direction to fail in.
+ *
+ * Idempotent: an account already CLOSED for this reason is left alone, so a
+ * replayed payment confirmation does not write a second event.
+ */
+export async function closeIfLifetimeCapReached(
+  tradingAccountId: string,
+  actor: string,
+): Promise<boolean> {
+  const account = await prisma.tradingAccount.findUnique({
+    where: { id: tradingAccountId },
+    include: { planVersion: true },
+  });
+  if (!account) return false;
+  if (account.tradingStatus === 'CLOSED' || account.tradingStatus === 'BREACHED') return false;
+
+  const rules = toRuleSnapshot(account.planVersion);
+  let capMinor: bigint | null;
+  try {
+    capMinor = lifetimeCapForPayout(rules)?.minor ?? null;
+  } catch {
+    // An undecided cap cannot be reached. Payouts are already blocked on it.
+    return false;
+  }
+
+  const reservations = await prisma.payoutReservation.findMany({
+    where: { tradingAccountId, status: { in: ['ACTIVE', 'CONSUMED'] } },
+    select: { cashAmountMinor: true, status: true },
+  });
+  const reservedMinor = reservations
+    .filter((r) => r.status === 'ACTIVE')
+    .reduce((total, r) => total + r.cashAmountMinor, 0n);
+  const consumedMinor = reservations
+    .filter((r) => r.status === 'CONSUMED')
+    .reduce((total, r) => total + r.cashAmountMinor, 0n);
+
+  const completion = checkLifetimeCapReached({
+    lifetimeCapMinor: capMinor,
+    reservedMinor,
+    consumedMinor,
+  });
+  if (!completion.complete) return false;
+
+  await prisma.tradingAccount.update({
+    where: { id: tradingAccountId },
+    data: { tradingStatus: 'CLOSED', statusReason: completion.message },
+  });
+
+  // Recorded as a risk event so it appears on the account timeline alongside
+  // breaches and lockouts. Severity is INFO, not CRITICAL: the trader earned
+  // everything the account could pay, which is the opposite of a breach.
+  await prisma.riskEvent.create({
+    data: {
+      tradingAccountId,
+      eventType: 'LIFETIME_CAP_REACHED',
+      severity: 'INFO',
+      reason: completion.message ?? 'Lifetime payout cap reached.',
+      evidence: JSON.stringify({
+        lifetimeCapMinor: capMinor?.toString() ?? null,
+        consumedMinor: consumedMinor.toString(),
+        reservedMinor: reservedMinor.toString(),
+      }),
+      requestedAction: 'CLOSE_ACCOUNT',
+      actionConfirmed: true,
+    },
+  });
+
+  await recordAudit({
+    actorId: null,
+    actorLabel: actor,
+    action: 'ACCOUNT_COMPLETED_AT_CAP',
+    entityType: 'TradingAccount',
+    entityId: tradingAccountId,
+    reason: 'Lifetime payout cap reached; account closed.',
+    after: { tradingStatus: 'CLOSED' },
+  });
+
+  return true;
 }
 
 /**

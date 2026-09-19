@@ -145,3 +145,58 @@ export function exposureRatio(input: {
   if (input.pricePaidMinor <= 0n) return null;
   return Number(input.lifetimeCapMinor) / Number(input.pricePaidMinor);
 }
+
+// ---------------------------------------------------------------------------
+// Completion
+// ---------------------------------------------------------------------------
+
+export type CompletionReason = 'LIFETIME_CAP_REACHED';
+
+export interface CompletionCheck {
+  readonly complete: boolean;
+  readonly reason: CompletionReason | null;
+  readonly message: string | null;
+}
+
+/**
+ * Whether an account has finished: it has been paid its whole lifetime cap.
+ *
+ * This is a COMPLETION, not a breach. The trader did nothing wrong and lost
+ * nothing — they earned everything the account was ever going to pay. The
+ * distinction matters in every place this surfaces, because telling someone
+ * their account "ended" in the same words used for a drawdown breach turns a
+ * success into a grievance.
+ *
+ * The account closes rather than continuing to trade. Letting it run on with
+ * no capacity left would have someone trading for a payout that cannot arrive,
+ * which is worse than stopping them.
+ *
+ * An uncapped account (null) is never complete: there is no amount that
+ * exhausts an unbounded policy.
+ */
+export function checkLifetimeCapReached(input: {
+  lifetimeCapMinor: bigint | null;
+  reservedMinor: bigint;
+  consumedMinor: bigint;
+}): CompletionCheck {
+  if (input.lifetimeCapMinor === null) {
+    return { complete: false, reason: null, message: null };
+  }
+
+  // Reserved capacity counts: a request in flight has already claimed it, and
+  // treating the account as live until settlement would let it start another
+  // trade for money it can never be paid.
+  const committed = input.reservedMinor + input.consumedMinor;
+  if (committed < input.lifetimeCapMinor) {
+    return { complete: false, reason: null, message: null };
+  }
+
+  return {
+    complete: true,
+    reason: 'LIFETIME_CAP_REACHED',
+    message:
+      'This account has been paid its full lifetime cash limit and is now complete. ' +
+      'It is closed for trading. A reset restores the balance but not payout capacity, ' +
+      'so continuing means buying a new account.',
+  };
+}
