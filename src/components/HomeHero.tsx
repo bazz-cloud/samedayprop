@@ -14,11 +14,21 @@ import { BullMark } from './BrandLogo';
  * everything else renders immediately at its final position.
  */
 export function HomeHero() {
+  /**
+   * The same three claims as the site-wide banner, one line each.
+   *
+   * These drive the render. They previously only supplied the delays while the
+   * words themselves were hardcoded in the JSX below, which is how the hero and
+   * the banner came to disagree.
+   *
+   * "No minimum trading days" is split across two lines deliberately: at the
+   * display size it wraps anyway, and choosing the break keeps the stagger even.
+   */
   const claims = [
-    { text: 'NO CONSISTENCY.', delay: '0.85s', tone: 'text-fg' },
-    { text: 'NO EVALUATION.', delay: '1.05s', tone: 'text-accent' },
-    { text: 'SIMPLE SAME-DAY', delay: '1.25s', tone: 'text-fg' },
-    { text: 'PAYOUT RULES.', delay: '1.25s', tone: 'text-fg', sameLine: true },
+    { text: 'No consistency.', delay: '0.85s', tone: 'text-fg' },
+    { text: 'No evaluation.', delay: '1.05s', tone: 'text-accent' },
+    { text: 'No minimum', delay: '1.25s', tone: 'text-fg' },
+    { text: 'trading days.', delay: '1.4s', tone: 'text-fg' },
   ];
 
   return (
@@ -67,37 +77,22 @@ export function HomeHero() {
           {/* ---- the claims ----------------------------------------------- */}
           <div className="lg:col-span-8 order-2">
             <h1 id="hero-heading" className="sr-only">
-              Bull Rush Futures — no consistency rule, no evaluation, simple same-day payout rules
+              Bull Rush Futures — no consistency rule, no evaluation, no minimum trading days
             </h1>
 
             <div
               aria-hidden="true"
               className="display text-[2.15rem] leading-[1.05] sm:text-6xl lg:text-7xl uppercase tracking-tighter"
             >
-              <span
-                className="anim-word block italic text-fg"
-                style={{ animationDelay: claims[0]!.delay }}
-              >
-                No consistency.
-              </span>
-              <span
-                className="anim-word block italic text-accent"
-                style={{ animationDelay: claims[1]!.delay }}
-              >
-                No evaluation.
-              </span>
-              <span
-                className="anim-word block italic text-fg"
-                style={{ animationDelay: claims[2]!.delay }}
-              >
-                Simple same-day
-              </span>
-              <span
-                className="anim-word block italic text-fg"
-                style={{ animationDelay: '1.4s' }}
-              >
-                payout rules.
-              </span>
+              {claims.map((claim) => (
+                <span
+                  key={claim.text}
+                  className={`anim-word block italic ${claim.tone}`}
+                  style={{ animationDelay: claim.delay }}
+                >
+                  {claim.text}
+                </span>
+              ))}
             </div>
 
             {/* No marketing paragraph above the fold. What this paragraph used to
