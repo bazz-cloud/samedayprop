@@ -19,9 +19,22 @@ const DIRECT_URL_KEYS = [
   'POSTGRES_URL_NON_POOLING', // Vercel Postgres
 ];
 
-const direct = DIRECT_URL_KEYS.map((key) => [key, process.env[key]]).find(
-  ([, value]) => value && value.trim() !== '',
-);
+function findDirectUrl() {
+  const named = DIRECT_URL_KEYS.map((key) => [key, process.env[key]]).find(
+    ([, value]) => value && value.trim() !== '',
+  );
+  if (named) return named;
+
+  // Hosted integrations let you rename the variables they inject (Neon calls it
+  // a "custom prefix"), so the exact key is not knowable in advance. The suffix
+  // is: whatever the prefix, the unpooled endpoint keeps it.
+  return Object.entries(process.env).find(
+    ([key, value]) =>
+      /_URL_UNPOOLED$|_URL_NON_POOLING$/.test(key) && value && value.trim() !== '',
+  );
+}
+
+const direct = findDirectUrl();
 
 const env = { ...process.env };
 
