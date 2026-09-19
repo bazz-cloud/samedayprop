@@ -40,11 +40,26 @@ describe('platform catalog', () => {
   });
 });
 
+describe('Tradovate configuration', () => {
+  it('refuses to construct without all three of base URL, API key and CID', () => {
+    // Tradovate's documentation requires organization admin credentials, an API
+    // key and a CID together. Failing at construction beats a confusing 401 on
+    // the first real call.
+    expect(() => new TradovateProvider('SANDBOX', 'https://x.invalid', 'key', '')).toThrow(/CID/);
+    expect(() => new TradovateProvider('SANDBOX', '', 'key', 'cid')).toThrow();
+  });
+});
+
 describe('neither adapter pretends', () => {
   const account = 'acct-1';
 
   it('Tradovate refuses every capability while nothing is verified', async () => {
-    const provider = new TradovateProvider('SANDBOX', 'https://example.invalid', 'key');
+    const provider = new TradovateProvider(
+      'SANDBOX',
+      'https://demo-api.staging.ninjatrader.dev',
+      'key',
+      'cid',
+    );
     await expect(
       provider.provisionAccount({
         orderId: 'o',

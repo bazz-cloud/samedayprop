@@ -24,7 +24,23 @@ export interface ProviderConfig {
   readonly trading: {
     readonly driver: 'mock' | 'tradovate';
     readonly configured: boolean;
-    readonly baseUrl: string | null;
+    /**
+     * Which Tradovate environment the hosts point at. STAGING is
+     * *.staging.ninjatrader.dev; PRODUCTION is *.tradovateapi.com.
+     */
+    readonly environment: 'STAGING' | 'PRODUCTION' | null;
+    /**
+     * The SIMULATION engine host. This is the one this business uses, and the
+     * naming is a trap worth spelling out: `demo.tradovateapi.com` is a
+     * PRODUCTION host that serves the simulation engine. It is not a test
+     * environment. The test environment is the staging domain.
+     */
+    readonly simBaseUrl: string | null;
+    /** The live-trading host. We do not trade live, so this stays unset. */
+    readonly liveBaseUrl: string | null;
+    readonly marketDataUrl: string | null;
+    /** Organization id issued with the API key. Required on every call. */
+    readonly cid: string | null;
   };
   readonly email: {
     readonly driver: 'local-outbox' | 'smtp';
@@ -117,6 +133,42 @@ function readMode(): AppMode {
   throw new Error(`APP_MODE must be DEMO, SANDBOX or PRODUCTION; received ${raw}`);
 }
 
+/**
+ * Tradovate's published hosts, by environment.
+ *
+ * Hard-coded rather than read from an env var so a typo cannot silently point
+ * the simulation engine at the live one. Source: the Tradovate Partner API
+ * introduction page.
+ */
+const TRADOVATE_HOSTS = {
+  PRODUCTION: {
+    sim: 'https://demo.tradovateapi.com',
+    live: 'https://live.tradovateapi.com',
+    md: 'https://md.tradovateapi.com',
+  },
+  STAGING: {
+    sim: 'https://demo-api.staging.ninjatrader.dev',
+    live: 'https://live-api.staging.ninjatrader.dev',
+    md: 'https://md-api.staging.ninjatrader.dev',
+  },
+} as const;
+
+function readTradovateEnvironment(): 'STAGING' | 'PRODUCTION' | null {
+  const raw = env('TRADOVATE_ENVIRONMENT')?.toUpperCase();
+  if (raw === 'STAGING' || raw === 'PRODUCTION') return raw;
+  if (raw) {
+    throw new Error(`TRADOVATE_ENVIRONMENT must be STAGING or PRODUCTION; received ${raw}`);
+  }
+  return null;
+}
+
+function tradovateHost(
+  environment: 'STAGING' | 'PRODUCTION' | null,
+  which: 'sim' | 'live' | 'md',
+): string | null {
+  return environment ? TRADOVATE_HOSTS[environment][which] : null;
+}
+
 let cached: AppConfig | null = null;
 
 export function getConfig(): AppConfig {
@@ -124,7 +176,14 @@ export function getConfig(): AppConfig {
 
   const mode = readMode();
   const paymentsConfigured = Boolean(env('PAYMENTS_PUBLIC_KEY') && env('PAYMENTS_SECRET_KEY'));
-  const tradingConfigured = Boolean(env('TRADOVATE_BASE_URL') && env('TRADOVATE_API_KEY'));
+  // All three are required together: Tradovate's own documentation says access
+  // needs organization admin credentials, an API key AND a CID. Two out of
+  // three is not a usable configuration, so it counts as unconfigured and the
+  // mock stays in place rather than a half-configured adapter failing later.
+  const tradovateEnvironment = readTradovateEnvironment();
+  const tradingConfigured = Boolean(
+    env('TRADOVATE_API_KEY') && env('TRADOVATE_CID') && tradovateEnvironment,
+  );
   const emailConfigured = Boolean(env('SMTP_URL'));
 
   const providers: ProviderConfig = {
@@ -136,7 +195,11 @@ export function getConfig(): AppConfig {
     trading: {
       driver: tradingConfigured ? 'tradovate' : 'mock',
       configured: tradingConfigured,
-      baseUrl: env('TRADOVATE_BASE_URL') ?? null,
+      environment: tradovateEnvironment,
+      simBaseUrl: tradovateHost(tradovateEnvironment, 'sim'),
+      liveBaseUrl: tradovateHost(tradovateEnvironment, 'live'),
+      marketDataUrl: tradovateHost(tradovateEnvironment, 'md'),
+      cid: env('TRADOVATE_CID') ?? null,
     },
     email: {
       driver: emailConfigured ? 'smtp' : 'local-outbox',

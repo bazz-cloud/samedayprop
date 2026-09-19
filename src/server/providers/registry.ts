@@ -69,10 +69,16 @@ export function getTradingProvider(platform: PlatformKey = DEFAULT_PLATFORM): Tr
     return new RithmicProvider(config.mode === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX');
   }
 
+  // The SIMULATION host, deliberately. Everything this business sells is a
+  // simulated account, and the live host is never the right one for it —
+  // `demo.tradovateapi.com` is a production host serving the simulation engine,
+  // not a sandbox. The sandbox is the staging environment, selected by
+  // TRADOVATE_ENVIRONMENT.
   tradingProvider ??= new TradovateProvider(
-    config.mode === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX',
-    config.providers.trading.baseUrl!,
+    config.providers.trading.environment === 'PRODUCTION' ? 'PRODUCTION' : 'SANDBOX',
+    config.providers.trading.simBaseUrl!,
     process.env.TRADOVATE_API_KEY!,
+    config.providers.trading.cid!,
   );
   return tradingProvider;
 }

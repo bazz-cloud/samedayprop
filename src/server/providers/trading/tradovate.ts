@@ -6,6 +6,30 @@
  * look like an integration, pass a cursory review, and fail against the real
  * partner API in production.
  *
+ * WHAT TRADOVATE'S OWN DOCUMENTATION STATES (read 2026-09-19, not yet exercised
+ * against a key, so every capability below stays UNVERIFIED):
+ *
+ *  - Access needs THREE things together: organization admin credentials, an API
+ *    key, and a CID. An Evaluation Support representative issues them.
+ *  - Hosts. Production: live.tradovateapi.com (live), demo.tradovateapi.com
+ *    (SIMULATION engine), md.tradovateapi.com (market data). Staging:
+ *    live-api / demo-api / md-api .staging.ninjatrader.dev.
+ *    `demo.` is a PRODUCTION host serving the simulation engine — it is not a
+ *    test environment, and this business runs against it in production.
+ *  - Partners can create organization members individually or in bulk, add and
+ *    cancel entitlements and subscription plans, create simulation accounts
+ *    individually or in bulk, grant trading permissions, apply pre- and
+ *    post-trade risk settings, halt trading for a risk category or the whole
+ *    organization, and expire manual lockouts a trader placed on themselves.
+ *  - Real-time events come over a WebSocket, not by polling.
+ *  - "Relaxed REST": POST when sending a JSON body, GET when not. All responses
+ *    are JSON.
+ *
+ * Every one of those maps onto a capability in this interface, which is why the
+ * capability list is not being rewritten — what is missing is a working call,
+ * not knowledge of what to call. VERIFIED in this codebase means documentation
+ * AND a successful call, and no call has been made.
+ *
  * Every capability is UNVERIFIED, so `requireCapability` throws before any
  * method body runs. To implement this adapter:
  *
@@ -69,9 +93,13 @@ export class TradovateProvider implements TradingProvider {
     readonly mode: 'SANDBOX' | 'PRODUCTION',
     private readonly baseUrl: string,
     private readonly apiKey: string,
+    private readonly cid: string,
   ) {
-    if (!baseUrl || !apiKey) {
-      throw new Error('TradovateProvider requires a base URL and an API key');
+    // All three, because Tradovate's documentation is explicit that access
+    // needs organization admin credentials, an API key and a CID. Failing here
+    // is better than failing on the first call with a confusing 401.
+    if (!baseUrl || !apiKey || !cid) {
+      throw new Error('TradovateProvider requires a base URL, an API key and a CID');
     }
   }
 

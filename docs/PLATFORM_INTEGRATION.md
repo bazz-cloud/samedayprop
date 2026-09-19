@@ -13,6 +13,53 @@ and the timeline are different by an order of magnitude.
 
 ---
 
+## Tradovate — confirmed from the vendor's own documentation
+
+Read from the Tradovate Partner API introduction, 2026-09-19. These are the
+vendor's statements, not results of calls we have made.
+
+**Access needs three things together**, issued by an Evaluation Support
+representative: **organization admin credentials**, an **API key**, and a
+**CID** (organization id).
+
+**Hosts.**
+
+| | Simulation engine | Live | Market data |
+|---|---|---|---|
+| Production | `demo.tradovateapi.com` | `live.tradovateapi.com` | `md.tradovateapi.com` |
+| Staging | `demo-api.staging.ninjatrader.dev` | `live-api.staging.ninjatrader.dev` | `md-api.staging.ninjatrader.dev` |
+
+**Read that table twice.** `demo.tradovateapi.com` is a *production* host that
+serves the simulation engine. It is not a test environment. Everything this
+business sells is a simulated account, so production traffic goes to `demo.` and
+the test environment is the staging domain. Getting this backwards means either
+testing against production or running the business against staging. The hosts
+are hard-coded per environment in `src/server/config.ts` for that reason.
+
+**Stated partner capabilities**, each of which maps onto a capability in our
+provider interface:
+
+| Tradovate says partners can | Our capability |
+|---|---|
+| Create organization members individually or in bulk | `createCustomerIdentity` |
+| Add entitlements and subscription plans | `marketDataEntitlements` |
+| Cancel entitlements, plans or trading permissions | `disableTrading` |
+| Create simulation accounts individually or in bulk | `provisionSimulatedAccount` |
+| Grant trading permissions to accounts | `provisionSimulatedAccount` |
+| Apply and manage pre- and post-trade risk settings | `configureRisk` |
+| Halt trading for a risk category or the whole organization | `disableTrading` |
+| Expire manual lockouts a trader set on themselves | `disableTrading` |
+| Subscribe to real-time events over WebSocket | `authoritativeEquityStream` |
+
+Also stated: "relaxed REST" — POST when sending a JSON body, GET when not; all
+responses JSON. Privileged creation and update commands are the part of Trader
+that is *not* exposed to ordinary API users, which is precisely what partner
+access unlocks.
+
+**Nothing above is VERIFIED in this codebase**, and that is not pedantry.
+VERIFIED here means documentation *and* a successful call. We have the first
+and none of the second, so every capability still throws.
+
 ## Tradovate — the practical path
 
 Tradovate publishes a **Partner API** aimed at prop firms, at
