@@ -83,6 +83,15 @@ reachable hostname lets anyone forge a session cookie, the admin console
 included. The app refuses to boot rather than do that, so the deploy will fail
 visibly if you skip it.
 
+### Keeping the site private
+
+Vercel's own password protection is a Pro feature, so the app carries its own.
+Set `SITE_PASSWORD` to any value and the entire deployment — pages, API routes
+and the build's JavaScript chunks — sits behind one shared password until it is
+entered. Unset it and the site is public again. It is a curtain, not a security
+boundary: everyone who gets in shares one secret, so it is not a reason to put
+real customer data on a deployment.
+
 ### Leave these blank
 
 `PAYMENTS_PUBLIC_KEY`, `PAYMENTS_SECRET_KEY`, `PAYMENTS_WEBHOOK_SECRET`,
