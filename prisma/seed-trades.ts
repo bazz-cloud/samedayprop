@@ -58,6 +58,13 @@ export async function seedTrades(): Promise<{ trades: number; clustered: number 
 
   if (accounts.length === 0) return { trades: 0, clustered: 0 };
 
+  // Idempotent: re-running replaces the fixtures rather than colliding with the
+  // unique (provider, providerTradeId) guard, which is doing its job by
+  // refusing a second write of the same provider trade.
+  await prisma.trade.deleteMany({
+    where: { providerTradeId: { startsWith: 'demo-' } },
+  });
+
   const random = seededRandom(20260919);
   const sessionDate = sessionDateFor(new Date(), DEFAULT_SESSION_CONFIG.value);
   const now = Date.now();
@@ -169,6 +176,60 @@ export async function seedTrades(): Promise<{ trades: number; clustered: number 
       },
     });
     written += 1;
+  }
+
+  // ---- equity checkpoints ---------------------------------------------------
+  // Walked FORWARD through each account's own trades so the curve and the trade
+  // table agree. A curve generated independently of the trades would show one
+  // story in the chart and a different one in the rows beneath it.
+  //
+  // The threshold follows the risk engine's own rule, T = min(S + 100, H - D),
+  // rather than being drawn as a smooth line under the equity: the whole point
+  // of plotting it is that it steps and never falls.
+  for (const account of accounts) {
+    const own = await prisma.trade.findMany({
+      where: { tradingAccountId: account.id, status: 'CLOSED' },
+      orderBy: { closedAt: 'asc' },
+      select: { closedAt: true, realisedPnlMinor: true },
+    });
+    if (own.length === 0) continue;
+
+    const plan = await prisma.tradingAccount.findUniqueOrThrow({
+      where: { id: account.id },
+      include: { planVersion: true },
+    });
+
+    const startingMinor = plan.startingBalanceMinor;
+    const drawdownMinor = plan.planVersion.drawdownAllowanceMinor;
+    const stopMinor = startingMinor + 10_000n; // starting balance + $100
+
+    let equity = startingMinor;
+    let highWater = startingMinor;
+    let sequence = 100n;
+
+    await prisma.equityCheckpoint.deleteMany({ where: { tradingAccountId: account.id } });
+
+    for (const trade of own) {
+      equity += trade.realisedPnlMinor;
+      if (equity > highWater) highWater = equity;
+      const trailing = highWater - drawdownMinor;
+      const threshold = trailing < stopMinor ? trailing : stopMinor;
+
+      await prisma.equityCheckpoint.create({
+        data: {
+          tradingAccountId: account.id,
+          sessionDate,
+          equityMinor: equity,
+          balanceMinor: equity,
+          unrealisedMinor: 0n,
+          commissionsMinor: 0n,
+          highWaterMinor: highWater,
+          thresholdMinor: threshold,
+          sequence: sequence++,
+          observedAt: trade.closedAt!,
+        },
+      });
+    }
   }
 
   return { trades: written, clustered: clusterAccounts.length };

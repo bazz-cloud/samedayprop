@@ -20,7 +20,15 @@ import {
   remainingLifetimeCap,
   type Headroom,
 } from '@/domain/analytics/exposure';
-import { computeTradeStats, type ClosedTrade, type TradeStats } from '@/domain/analytics/trade-stats';
+import {
+  byHour,
+  bySide,
+  bySymbol,
+  computeTradeStats,
+  durationDistribution,
+  type ClosedTrade,
+  type TradeStats,
+} from '@/domain/analytics/trade-stats';
 import {
   buildClusters,
   clusterExposure,
@@ -582,3 +590,177 @@ export async function getOwnerSignals() {
 
 export const money = (minor: bigint) => Money.fromMinor(minor);
 export { unavailable };
+
+// ---------------------------------------------------------------------------
+// Account detail
+// ---------------------------------------------------------------------------
+
+export interface EquityPoint {
+  readonly observedAt: Date;
+  readonly equityMinor: bigint;
+  readonly thresholdMinor: bigint;
+  readonly highWaterMinor: bigint;
+}
+
+export interface TradeRow {
+  readonly id: string;
+  readonly symbol: string;
+  readonly side: 'LONG' | 'SHORT';
+  readonly quantity: number;
+  readonly entryPriceE8: bigint;
+  readonly exitPriceE8: bigint | null;
+  readonly openedAt: Date;
+  readonly closedAt: Date | null;
+  readonly status: string;
+  readonly realisedPnlMinor: bigint;
+  readonly commissionMinor: bigint;
+  /** Return on the notional moved, or null while the position is open. */
+  readonly returnPercent: number | null;
+  readonly holdSeconds: number | null;
+}
+
+export interface AccountDetail {
+  readonly row: AccountRow;
+  readonly equityCurve: readonly EquityPoint[];
+  readonly trades: readonly TradeRow[];
+  readonly stats: TradeStats;
+  readonly bySide: ReturnType<typeof bySide>;
+  readonly bySymbol: ReturnType<typeof bySymbol>;
+  readonly byHour: ReturnType<typeof byHour>;
+  readonly durations: ReturnType<typeof durationDistribution>;
+  readonly payouts: readonly {
+    readonly id: string;
+    readonly state: string;
+    readonly grossMinor: bigint;
+    readonly cashMinor: bigint;
+    readonly requestedAt: Date;
+    readonly paidAt: Date | null;
+  }[];
+  readonly riskEvents: readonly {
+    readonly id: string;
+    readonly eventType: string;
+    readonly severity: string;
+    readonly reason: string;
+    readonly occurredAt: Date;
+  }[];
+  readonly resets: readonly { readonly id: string; readonly priceMinor: bigint; readonly createdAt: Date }[];
+  readonly economics: {
+    readonly initialPaidMinor: bigint;
+    readonly resetSpendMinor: bigint;
+    readonly totalPaidMinor: bigint;
+    readonly cashPaidOutMinor: bigint;
+    readonly netToFirmMinor: bigint;
+    /** Cash paid out divided by what they paid. Null when they paid nothing. */
+    readonly realisedRatio: number | null;
+  };
+}
+
+export async function getAccountDetail(tradingAccountId: string): Promise<AccountDetail | null> {
+  const rows = await getAccountRows();
+  const row = rows.find((r) => r.id === tradingAccountId);
+  if (!row) return null;
+
+  const [checkpoints, tradeRecords, payoutRecords, riskEventRecords, resetRecords] =
+    await Promise.all([
+      prisma.equityCheckpoint.findMany({
+        where: { tradingAccountId },
+        orderBy: { observedAt: 'asc' },
+      }),
+      prisma.trade.findMany({ where: { tradingAccountId }, orderBy: { openedAt: 'desc' } }),
+      prisma.payoutRequest.findMany({
+        where: { tradingAccountId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.riskEvent.findMany({
+        where: { tradingAccountId },
+        orderBy: { occurredAt: 'desc' },
+        take: 50,
+      }),
+      prisma.accountReset.findMany({
+        where: { tradingAccountId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+  const closed: ClosedTrade[] = tradeRecords
+    .filter((t) => t.status === 'CLOSED' && t.closedAt !== null)
+    .map((t) => ({
+      symbol: t.symbol,
+      side: t.side as 'LONG' | 'SHORT',
+      quantity: t.quantity,
+      realisedPnlMinor: t.realisedPnlMinor,
+      commissionMinor: t.commissionMinor,
+      openedAt: t.openedAt,
+      closedAt: t.closedAt!,
+    }));
+
+  const cashPaidOutMinor = payoutRecords
+    .filter((p) => p.state === 'paid')
+    .reduce((total, p) => total + p.cashMinor, 0n);
+  const resetSpendMinor = resetRecords.reduce((total, r) => total + r.priceMinor, 0n);
+  const initialPaidMinor = row.paidMinor - resetSpendMinor;
+
+  return {
+    row,
+    equityCurve: checkpoints.map((c) => ({
+      observedAt: c.observedAt,
+      equityMinor: c.equityMinor,
+      thresholdMinor: c.thresholdMinor,
+      highWaterMinor: c.highWaterMinor,
+    })),
+    trades: tradeRecords.map((t) => {
+      // Return is measured on the price move, not on account equity: a $200
+      // win on one contract and on ten are different trades, and dividing by
+      // the account balance would make both look identical.
+      const notional = Number(t.entryPriceE8) / 1e8;
+      const exit = t.exitPriceE8 === null ? null : Number(t.exitPriceE8) / 1e8;
+      const move = exit === null ? null : t.side === 'LONG' ? exit - notional : notional - exit;
+      return {
+        id: t.id,
+        symbol: t.symbol,
+        side: t.side as 'LONG' | 'SHORT',
+        quantity: t.quantity,
+        entryPriceE8: t.entryPriceE8,
+        exitPriceE8: t.exitPriceE8,
+        openedAt: t.openedAt,
+        closedAt: t.closedAt,
+        status: t.status,
+        realisedPnlMinor: t.realisedPnlMinor,
+        commissionMinor: t.commissionMinor,
+        returnPercent: move === null || notional === 0 ? null : (move / notional) * 100,
+        holdSeconds:
+          t.closedAt === null ? null : (t.closedAt.getTime() - t.openedAt.getTime()) / 1000,
+      };
+    }),
+    stats: computeTradeStats(closed),
+    bySide: bySide(closed),
+    bySymbol: bySymbol(closed),
+    byHour: byHour(closed, 'America/New_York'),
+    durations: durationDistribution(closed),
+    payouts: payoutRecords.map((p) => ({
+      id: p.id,
+      state: p.state,
+      grossMinor: p.grossMinor,
+      cashMinor: p.cashMinor,
+      requestedAt: p.createdAt,
+      paidAt: p.paidAt,
+    })),
+    riskEvents: riskEventRecords.map((e) => ({
+      id: e.id,
+      eventType: e.eventType,
+      severity: e.severity,
+      reason: e.reason,
+      occurredAt: e.occurredAt,
+    })),
+    resets: resetRecords.map((r) => ({ id: r.id, priceMinor: r.priceMinor, createdAt: r.createdAt })),
+    economics: {
+      initialPaidMinor,
+      resetSpendMinor,
+      totalPaidMinor: row.paidMinor,
+      cashPaidOutMinor,
+      netToFirmMinor: row.paidMinor - cashPaidOutMinor,
+      realisedRatio:
+        row.paidMinor <= 0n ? null : Number(cashPaidOutMinor) / Number(row.paidMinor),
+    },
+  };
+}

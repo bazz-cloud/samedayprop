@@ -130,7 +130,12 @@ export default async function AdminAccountsPage() {
             {sorted.map((row) => (
               <tr key={row.id} className="border-t border-border align-top">
                 <td className="px-3 py-3">
-                  <span className="no-caps block font-medium">{row.ownerName ?? '—'}</span>
+                  <Link
+                    href={`/admin/accounts/${row.id}`}
+                    className="no-caps block font-medium text-accent hover:underline"
+                  >
+                    {row.ownerName ?? row.ownerEmail}
+                  </Link>
                   <span className="no-caps block text-xs text-fg-subtle">{row.ownerEmail}</span>
                   {row.inCluster && (
                     <span className="mt-1 inline-block">
