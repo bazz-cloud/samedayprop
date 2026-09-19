@@ -17,7 +17,7 @@
     "worker": "tsx src/server/jobs/worker-entry.ts",
     "setup": "prisma generate && prisma db push --skip-generate && npm run db:seed",
     "postinstall": "node scripts/set-db-provider.mjs && prisma generate",
-    "vercel-build": "node scripts/set-db-provider.mjs && prisma generate && prisma db push --skip-generate && node scripts/seed-if-demo.mjs && next build",
+    "vercel-build": "node scripts/set-db-provider.mjs && prisma generate && node scripts/db-push.mjs && node scripts/seed-if-demo.mjs && next build",
     "db:provider": "node scripts/set-db-provider.mjs"
   },
   "dependencies": {

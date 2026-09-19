@@ -23,6 +23,13 @@ URL rather than falling through to SQLite.
 If `DATABASE_URL` is missing or SQLite, the build fails on purpose. A warning
 would let a deployment go live that builds cleanly and then loses every write.
 
+Neon and Vercel Postgres both point `DATABASE_URL` at a pooled (pgbouncer)
+endpoint. That is right for serving requests and wrong for schema changes, so
+the build pushes the schema over the unpooled URL those providers expose
+alongside it (`DATABASE_URL_UNPOOLED`, `POSTGRES_URL_NON_POOLING`), or
+`DIRECT_DATABASE_URL` if you set one. Nothing to configure — it is picked up
+automatically.
+
 The Prisma schema adapts on its own: `scripts/set-db-provider.mjs` reads the
 scheme of `DATABASE_URL` at build time and rewrites the datasource provider, so
 `file:./dev.db` stays SQLite locally and `postgres://…` builds a Postgres schema
