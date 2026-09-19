@@ -3,6 +3,7 @@ import { getPlanViews } from '@/server/views/catalog-view';
 import { PlanComparisonTable } from '@/components/PlanComparisonTable';
 import { HomeHero } from '@/components/HomeHero';
 import { DisclosureBlock, SpecTable, StatGrid, StatPair } from '@/components/system';
+import { WithdrawalCalculator } from '@/components/WithdrawalCalculator';
 
 /**
  * Home.
@@ -20,50 +21,58 @@ import { DisclosureBlock, SpecTable, StatGrid, StatPair } from '@/components/sys
 export default function HomePage() {
   const plans = getPlanViews();
   const fiftyK = plans.find((p) => p.key === 'SIM_50K')!;
-  const cheapest = plans.find((p) => p.key === 'SIM_25K')!;
+  const calculatorPlans = plans.map((plan) => ({
+    key: plan.key,
+    label: plan.label,
+    startingBalance: plan.startingBalance.display,
+    retainedBuffer: plan.retainedBuffer.display,
+    firstWithdrawalAt: plan.firstWithdrawalAt.display,
+    firstWithdrawalGross: plan.firstWithdrawalGross.display,
+    firstWithdrawalCash: plan.firstWithdrawalCash.display,
+    firstWithdrawalLeaves: plan.firstWithdrawalLeaves.display,
+  }));
 
   return (
     <>
       <HomeHero />
       <div className="mx-auto max-w-7xl px-4">
-        <section aria-labelledby="what" className="pb-14">
-          <h2 id="what" className="sr-only">
-            What this is
+        {/* Directly under the hero, which is deliberately unchanged. The
+            $500 -> $250 arithmetic is the strongest trust asset on the site and
+            previously read as fine print. */}
+        <section aria-labelledby="calculator" className="pb-14">
+          <h2 id="calculator" className="sr-only">
+            What a withdrawal pays you
           </h2>
-          <p className="no-caps text-xl sm:text-2xl font-bold leading-snug max-w-3xl">
-            Buy a simulated futures account, trade it under published limits, keep 50% of profits
-            in real cash.
-          </p>
-          <div className="mt-5 flex flex-wrap items-center gap-4">
-            <Link
-              href="/accounts"
-              className="rounded-lg bg-accent px-6 py-3 font-bold text-bg hover:bg-accent-strong transition-colors"
-            >
-              Get paid
-            </Link>
-            <p className="no-caps text-sm text-fg-muted">
-              From <span className="tnum font-bold text-fg">{cheapest.couponPrice.display}</span>{' '}
-              once, with code {cheapest.couponCode}. Nothing renews.
-            </p>
-          </div>
+          <WithdrawalCalculator plans={calculatorPlans} />
         </section>
 
-        <section aria-labelledby="differences" className="pb-14">
-          <h2 id="differences" className="text-2xl mb-5">
-            What this does not have
+        <section aria-labelledby="tradeoff" className="pb-14">
+          <h2 id="tradeoff" className="text-2xl mb-5">
+            The trade-off, stated plainly
           </h2>
-          <StatGrid>
-            <StatPair icon="◆" label="No evaluation phase" />
-            <StatPair icon="◆" label="No consistency rule" />
-            <StatPair icon="◆" label="No minimum days" />
-            <StatPair icon="◆" label="No subscription" />
-          </StatGrid>
-          <p className="no-caps mt-4 text-sm text-fg-muted max-w-2xl">
-            The trade: your profit share is 50%, not the 80–90% advertised elsewhere.{' '}
-            <Link href="/about" className="text-accent hover:underline">
-              How this differs
-            </Link>
-          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-xl border border-border-strong bg-card p-5">
+              <p className="label">Them</p>
+              <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
+                80&ndash;90% split, but you pay monthly, pass an evaluation, and meet consistency
+                and minimum-day rules first.
+              </p>
+            </div>
+            <div className="rounded-xl border border-accent bg-card-accent p-5">
+              <p className="label text-accent">Us</p>
+              <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
+                50% split, one payment, trade the account the hour you buy it and withdraw the day
+                you qualify.
+              </p>
+            </div>
+            <div className="rounded-xl border border-border-strong bg-card-danger p-5">
+              <p className="label text-danger">The risk</p>
+              <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
+                You can breach a limit, lose access, and lose the fee. Most participants in programs
+                of this kind never receive a payout.
+              </p>
+            </div>
+          </div>
         </section>
 
         <section aria-labelledby="plans" className="pb-14">

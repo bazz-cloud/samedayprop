@@ -12,46 +12,61 @@
  * cash figure — nothing else.
  */
 @theme {
-  --color-bg: #0a0a0b;
-  --color-surface: #141416;
-  --color-surface-raised: #1c1c1f;
-  --color-border: #2a2a2e;
-  --color-border-strong: #3c3c42;
+  /*
+   * Bull Rush Futures.
+   *
+   * Pure black ground, taken from the logo. Green is THE accent and the only
+   * one: buttons, links, cash figures, and the word "None" where a competitor
+   * would have a rule. Red is reserved exclusively for a breach or a negative
+   * P&L, so green always means good and a trader can read the dashboard at a
+   * glance without stopping to interpret a colour.
+   */
+  --color-bg: #000000;
+  --color-surface: #070807;
+  --color-card: #0d0f0d;
+  --color-card-accent: #101410;
+  --color-card-danger: #170f0e;
+
+  --color-border: #1a1d1a;
+  --color-border-strong: #242824;
+  --color-border-bold: #333833;
 
   --color-fg: #ffffff;
-  --color-fg-muted: #a6a6ad;
-  --color-fg-subtle: #74747c;
+  --color-fg-muted: #c9d1c9;
+  --color-fg-subtle: #9aa39a;
+  --color-fg-fine: #8b938b;
+  --color-fg-disabled: #6d746d;
 
-  /* Sampled from the logo's speed slashes. */
-  --color-accent: #4ade80;
-  --color-accent-strong: #22c55e;
-  --color-accent-dim: #0c2e1a;
+  --color-accent: #4ce06a;
+  --color-accent-strong: #86f09b;
+  --color-accent-dim: #101410;
 
   /*
-   * Status carries on FILL, not on hue.
-   *
-   * There is no amber, no red and no blue on this site. Green is the only hue,
-   * so a status that needs to stand out does it by inverting to white or by
-   * dropping its fill, never by introducing a second colour.
-   *
-   * The token names are kept so that every existing usage keeps working while
-   * pages are converted to the chip components one at a time.
-   *
-   *   warn   -> white outline on nothing: "not settled"
-   *   danger -> solid white: "stop", the loudest thing available here
-   *   info   -> grey: neutral context
+   * Breach and loss only. Never a status chip, never a warning about an
+   * unapproved term — those are grey. If red appears, money was lost or an
+   * account ended.
    */
-  --color-warn: #ffffff;
-  --color-warn-dim: #1c1c1f;
-  --color-danger: #ffffff;
-  --color-danger-dim: #2a2a2e;
-  --color-info: #a6a6ad;
+  --color-danger: #ff5f4d;
+  --color-danger-dim: #170f0e;
 
-  /* Arial throughout, as specified. Helvetica and the generic sans are there
-     only so the page still sets on a machine without Arial installed. */
+  /* Kept as aliases so existing usages keep working; both resolve to neutrals
+     rather than introducing a second hue. */
+  --color-warn: #ffffff;
+  --color-warn-dim: #0d0f0d;
+  --color-info: #9aa39a;
+  --color-surface-raised: #0d0f0d;
+
+  /* Arial for everything that is words. */
   --font-sans: Arial, Helvetica, 'Liberation Sans', sans-serif;
   --font-display: 'Arial Black', 'Arial Bold', Arial, Helvetica, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /*
+   * Every numeral on the site. Tabular figures are what make a column of
+   * prices line up, which is the single biggest readability win available on a
+   * page that is mostly money. No webfont is loaded for it: ui-monospace is
+   * already an excellent tabular face on every current platform, and a network
+   * round trip to render a balance is a poor trade.
+   */
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 html {
@@ -62,7 +77,15 @@ body {
   background-color: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Prose sets ragged rather than with orphans, and stops short of a line length
+   that becomes hard to track back from. */
+p {
+  text-wrap: pretty;
 }
 
 /* Headings are Arial Black, all caps.
@@ -75,7 +98,7 @@ h3,
   font-family: var(--font-display);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.015em;
 }
 
 /* Caps are for headings. Anything that is a sentence rather than a label keeps
@@ -148,8 +171,24 @@ h3,
   border-radius: 4px;
 }
 
+/*
+ * Numerals. Applied to every price, balance, limit, P&L and percentage.
+ * Monospace plus tabular figures so digits occupy identical width and columns
+ * of figures align down the page.
+ */
 .tnum {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Small uppercase labels: ORDER SUMMARY, ROOM TO THE FLOOR. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
 }
 
 /* ---------------------------------------------------------------------------
