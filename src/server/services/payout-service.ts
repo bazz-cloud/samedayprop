@@ -38,6 +38,7 @@ import {
 import { DEFAULT_SESSION_CONFIG, lockoutHasLifted, sessionDateFor } from '@/domain/risk/session';
 import { buildObligationEntry, buildPayoutEntries } from '@/domain/ledger/entries';
 import { lifetimeCapForPayout, toRuleSnapshot } from './catalog-service';
+import { checkPayoutProfile } from '@/domain/customer/profile';
 import { postEntries, postEntry } from './ledger-service';
 import { recordAudit } from './audit-service';
 import { getTradingProvider } from '@/server/providers/registry';
@@ -185,6 +186,40 @@ export async function requestPayout(input: {
   });
   if (account.userId !== input.userId) {
     throw new PayoutError('FORBIDDEN', 'That account belongs to another customer.');
+  }
+
+  // We must hold enough to pay a real person before promising them money.
+  // Checked here rather than only in the UI: a payout reserved against capacity
+  // we cannot actually disburse would hold that capacity away from a request we
+  // could have honoured.
+  const profile = await prisma.customerProfile.findUnique({
+    where: { userId: input.userId },
+    select: {
+      phone: true,
+      addressLine1: true,
+      addressLine2: true,
+      city: true,
+      region: true,
+      postalCode: true,
+      countryCode: true,
+    },
+  });
+  const profileCheck = checkPayoutProfile(
+    profile ?? {
+      phone: null,
+      addressLine1: null,
+      addressLine2: null,
+      city: null,
+      region: null,
+      postalCode: null,
+      countryCode: null,
+    },
+  );
+  if (!profileCheck.ok) {
+    throw new PayoutError(
+      'PROFILE_INCOMPLETE',
+      `We need a few details before we can pay you. ${profileCheck.messages.join(' ')}`,
+    );
   }
 
   const view = await getPayoutView(input.tradingAccountId);

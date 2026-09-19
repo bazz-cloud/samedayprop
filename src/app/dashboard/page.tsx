@@ -5,6 +5,8 @@ import type { Metadata } from 'next';
 import { getCurrentUser } from '@/server/auth/session';
 import { getDashboardAccount, listAccounts } from '@/server/views/dashboard-view';
 import { Badge, Callout, Card, DataRow, StatusDot } from '@/components/ui';
+import { checkPayoutProfile } from '@/domain/customer/profile';
+import { prisma } from '@/server/db';
 import { PayoutRequestForm } from '@/components/PayoutRequestForm';
 import { ResetCard, type ResetOfferView } from '@/components/ResetCard';
 import { getResetOffer } from '@/server/services/reset-service';
@@ -118,6 +120,32 @@ export default async function DashboardPage({
         )
       : 0;
 
+  // Checked here so the prompt appears while there is still time to act on it,
+  // rather than at the moment a payout is refused.
+  const customerProfile = await prisma.customerProfile.findUnique({
+    where: { userId: user.id },
+    select: {
+      phone: true,
+      addressLine1: true,
+      addressLine2: true,
+      city: true,
+      region: true,
+      postalCode: true,
+      countryCode: true,
+    },
+  });
+  const profileCheck = checkPayoutProfile(
+    customerProfile ?? {
+      phone: null,
+      addressLine1: null,
+      addressLine2: null,
+      city: null,
+      region: null,
+      postalCode: null,
+      countryCode: null,
+    },
+  );
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -128,6 +156,12 @@ export default async function DashboardPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/profile"
+            className="rounded-lg border border-border-strong px-4 py-2 text-sm hover:border-accent hover:text-accent"
+          >
+            Your details
+          </Link>
           <Link
             href="/dashboard/documents"
             className="rounded-lg border border-border-strong px-4 py-2 text-sm hover:border-accent hover:text-accent"
@@ -142,6 +176,17 @@ export default async function DashboardPage({
           </Link>
         </div>
       </header>
+
+      {!profileCheck.ok && (
+        <Callout tone="warn" title="Add your details before your first payout">
+          We need an address and a contact number to pay you. Adding them now means a payout
+          request is not held up later.{' '}
+          <Link href="/dashboard/profile" className="text-accent hover:underline">
+            Add your details
+          </Link>
+          .
+        </Callout>
+      )}
 
       {accounts.length > 1 && (
         <nav aria-label="Your accounts" className="flex flex-wrap gap-2">

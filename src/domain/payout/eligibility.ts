@@ -189,7 +189,8 @@ export type RequestRejection =
   | 'CONFLICTING_ORDERS'
   | 'ACCOUNT_NOT_ACTIVE'
   | 'DATA_STALE'
-  | 'LIFETIME_CAP_UNRESOLVED';
+  | 'LIFETIME_CAP_UNRESOLVED'
+  | 'PROFILE_INCOMPLETE';
 
 export interface RequestValidation {
   readonly ok: boolean;

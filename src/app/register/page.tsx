@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Callout } from '@/components/ui';
+import { countryOptions } from '@/domain/customer/countries';
+import { MINIMUM_AGE_YEARS } from '@/domain/customer/profile';
 
 export const metadata: Metadata = { title: 'Create an account' };
 
@@ -12,12 +14,14 @@ export default async function RegisterPage({
   const params = await searchParams;
   const error = typeof params.error === 'string' ? params.error : null;
   const next = typeof params.next === 'string' ? params.next : null;
+  const countries = countryOptions();
 
   return (
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
       <p className="mt-2 text-sm text-fg-muted">
-        Creating an account is free. You choose and pay for a simulated account separately.
+        Creating an account is free. You choose and pay for a simulated account separately. We
+        ask for your address only when you first request a payout, not now.
       </p>
 
       {error && (
@@ -56,6 +60,44 @@ export default async function RegisterPage({
             required
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 focus:border-accent"
           />
+        </div>
+        <div>
+          <label htmlFor="countryCode" className="block text-sm font-medium mb-1">
+            Country of residence
+          </label>
+          <select
+            id="countryCode"
+            name="countryCode"
+            autoComplete="country"
+            required
+            defaultValue=""
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 focus:border-accent"
+          >
+            <option value="" disabled>
+              Select a country
+            </option>
+            {countries.map((country) => (
+              <option key={country.code} value={country.code}>
+                {country.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="dateOfBirth" className="block text-sm font-medium mb-1">
+            Date of birth
+          </label>
+          <input
+            id="dateOfBirth"
+            name="dateOfBirth"
+            type="date"
+            autoComplete="bday"
+            required
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 focus:border-accent"
+          />
+          <p className="text-xs text-fg-subtle mt-1">
+            You must be at least {MINIMUM_AGE_YEARS}. We use this only to check that.
+          </p>
         </div>
         <div>
           <label htmlFor="password" className="block text-sm font-medium mb-1">

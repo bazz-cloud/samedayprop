@@ -49,6 +49,8 @@ export interface AuthenticatedUser {
   readonly email: string;
   readonly role: UserRole;
   readonly legalName: string | null;
+  /** ISO 3166-1 alpha-2 country of residence, captured at registration. */
+  readonly countryCode: string | null;
   readonly emailVerifiedAt: Date | null;
   readonly mfaEnabledAt: Date | null;
 }
@@ -73,6 +75,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
     email: session.user.email,
     role: session.user.role as UserRole,
     legalName: session.user.legalName,
+    countryCode: session.user.countryCode,
     emailVerifiedAt: session.user.emailVerifiedAt,
     mfaEnabledAt: session.user.mfaEnabledAt,
   };

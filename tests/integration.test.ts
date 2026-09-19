@@ -89,7 +89,13 @@ async function seedBaseline(): Promise<void> {
   }
 }
 
-async function makeUser(): Promise<{ id: string; email: string }> {
+/**
+ * A registered trader who has completed their payout details.
+ *
+ * `withProfile: false` produces one who has not, which is the state a real
+ * customer is in between signing up and their first payout request.
+ */
+async function makeUser(withProfile = true): Promise<{ id: string; email: string }> {
   userCounter += 1;
   const email = `trader${userCounter}@example.invalid`;
   const password = await hashPassword('a-sufficiently-long-password');
@@ -102,9 +108,25 @@ async function makeUser(): Promise<{ id: string; email: string }> {
       passwordSalt: password.salt,
       passwordParams: password.params,
       legalName: `Test Trader ${userCounter}`,
+      countryCode: 'US',
+      dateOfBirth: new Date('1990-01-01T00:00:00Z'),
       role: 'TRADER',
     },
   });
+  if (withProfile) {
+    await prisma.customerProfile.create({
+      data: {
+        userId: user.id,
+        phone: '+1 555 0100',
+        addressLine1: '1 Example Street',
+        city: 'Chicago',
+        region: 'IL',
+        postalCode: '60601',
+        countryCode: 'US',
+        completedAt: new Date(),
+      },
+    });
+  }
   return { id: user.id, email };
 }
 
@@ -685,6 +707,41 @@ describe('payouts end to end', () => {
       e.lines.filter((l) => l.account.startsWith('REVENUE_')),
     );
     expect(revenueLines).toHaveLength(0);
+  });
+
+  it('blocks a payout until we hold an address and a contact number', async () => {
+    // Reserving capacity against a person we cannot actually pay would hold it
+    // away from a request we could have honoured.
+    const { userId, accountId } = await eligibleAccount();
+    await prisma.customerProfile.deleteMany({ where: { userId } });
+
+    await expect(
+      requestPayout({
+        userId,
+        tradingAccountId: accountId,
+        gross: usd('500.00'),
+        idempotencyKey: `no-profile-${accountId}`,
+      }),
+    ).rejects.toThrow(/before we can pay you/);
+
+    // Nothing was reserved, so the capacity is still available afterwards.
+    const reserved = await prisma.payoutReservation.count({
+      where: { tradingAccountId: accountId },
+    });
+    expect(reserved).toBe(0);
+  });
+
+  it('checks the profile before the undecided lifetime cap, since it is the fixable one', async () => {
+    const { userId, accountId } = await eligibleAccount();
+    await prisma.customerProfile.deleteMany({ where: { userId } });
+    await expect(
+      requestPayout({
+        userId,
+        tradingAccountId: accountId,
+        gross: usd('500.00'),
+        idempotencyKey: `order-${accountId}`,
+      }),
+    ).rejects.toThrow(/before we can pay you/);
   });
 
   it('blocks a payout while the lifetime cap is undecided', async () => {
