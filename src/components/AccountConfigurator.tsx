@@ -134,7 +134,7 @@ export function AccountConfigurator({
             <SectionHeading
               number={1}
               title="Choose your account size"
-              hint="One-time purchase. Larger accounts, larger limits."
+              hint="Larger accounts, larger limits."
             />
             <h3 id="size-heading" className="sr-only">
               Account size
@@ -177,20 +177,15 @@ export function AccountConfigurator({
                           {option.listPrice.display}
                         </span>
                       </div>
-                      <p className="text-xs text-fg-subtle">
-                        {option.positionCeiling.minis} minis / {option.positionCeiling.micros} micros
-                        {' · '}
-                        {option.dailyLossLimit.display} daily loss limit
-                      </p>
+                      {/* Limits are in the table above. Repeating them on every
+                          radio is the prose-restates-the-table problem. */}
                     </label>
                   );
                 })}
               </div>
             </fieldset>
-            <p className="text-xs text-fg-subtle mt-3">
-              Prices shown with code{' '}
-              <span className="font-mono text-fg-muted">{plan.couponCode}</span> &mdash; apply it in
-              step 4.
+            <p className="no-caps text-xs text-fg-subtle mt-3">
+              Apply code <span className="font-mono text-fg-muted">{plan.couponCode}</span> in step 4.
             </p>
           </section>
 
@@ -220,7 +215,7 @@ export function AccountConfigurator({
             <SectionHeading
               number={3}
               title="Optional extras"
-              hint="Optional. None of these affect your rules or payouts."
+              hint="None of these affect your rules or payouts."
             />
             <h3 id="extras-heading" className="sr-only">
               Optional extras
@@ -267,10 +262,7 @@ export function AccountConfigurator({
                 );
               })}
             </fieldset>
-            <Callout tone="neutral">
-              Stats, rules, payouts, exports, security and support are always included. No extra
-              changes your rules or your payouts.
-            </Callout>
+            <Callout tone="neutral">No extra changes your rules or your payouts.</Callout>
           </section>
 
           <section aria-labelledby="coupon-heading">
@@ -468,9 +460,11 @@ export function AccountConfigurator({
                 ))}
               </dl>
 
-              <p className="mt-4 text-xs text-fg-subtle leading-relaxed">
-                No evaluation, no consistency rule, no minimum trading days. Simulated account;
-                the balance is a nominal figure, not cash held for you.
+              {/* The "no evaluation / no consistency / no minimum days" line is
+                  cut: it is the stat grid on the home page and the legend above.
+                  The nominal-figure sentence stays — it is a disclosure. */}
+              <p className="no-caps mt-4 text-xs text-fg-subtle leading-relaxed">
+                Simulated account; the balance is a nominal figure, not cash held for you.
               </p>
             </section>
 
