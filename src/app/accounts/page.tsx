@@ -4,6 +4,7 @@ import { AccountConfigurator } from '@/components/AccountConfigurator';
 import { getAddOnViews, getPlanViews } from '@/server/views/catalog-view';
 import { getConfig } from '@/server/config';
 import { Chip, SpecTable } from '@/components/system';
+import { PlanCards, PricingFootnotes } from '@/components/PlanCards';
 
 export const metadata: Metadata = {
   title: 'Choose an account',
@@ -49,6 +50,13 @@ export default function AccountsPage() {
           </Link>
         </p>
 
+        <div className="mt-8">
+          <PlanCards plans={plans} />
+        </div>
+
+        <div className="mt-8">
+          <PricingFootnotes fiftyK={plans.find((p) => p.key === 'SIM_50K')!} />
+        </div>
       </div>
 
       <AccountConfigurator
@@ -62,7 +70,9 @@ export default function AccountsPage() {
           they want should not have to scroll past five rows of numbers to pick
           it; someone comparing can still see every account side by side here. */}
       <div className="mx-auto max-w-7xl px-4 pb-16">
-        <h2 className="text-2xl mb-4">Compare every account</h2>
+        <h2 id="compare" className="text-2xl mb-4 scroll-mt-24">
+          Compare all five
+        </h2>
         <div className="mt-6 overflow-x-auto">
           <div className="min-w-[60rem]">
             <SpecTable

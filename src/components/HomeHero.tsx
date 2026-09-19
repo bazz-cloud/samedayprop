@@ -82,7 +82,7 @@ export function HomeHero() {
 
             <div
               aria-hidden="true"
-              className="display text-[2.15rem] leading-[1.05] sm:text-6xl lg:text-7xl uppercase tracking-tighter"
+              className="display text-[2.15rem] leading-[1.05] sm:text-6xl lg:text-7xl uppercase"
             >
               {claims.map((claim) => (
                 <span

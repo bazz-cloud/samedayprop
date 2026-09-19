@@ -56,9 +56,15 @@
   --color-info: #9aa39a;
   --color-surface-raised: #0d0f0d;
 
-  /* Arial for everything that is words. */
+  /*
+   * Arial for everything that is words.
+   *
+   * Headings are Arial BOLD — the same family at weight 700 — not Arial Black,
+   * which is a separate and much heavier face. Display and body therefore share
+   * one stack, and the difference between them is weight and case, not family.
+   */
   --font-sans: Arial, Helvetica, 'Liberation Sans', sans-serif;
-  --font-display: 'Arial Black', 'Arial Bold', Arial, Helvetica, sans-serif;
+  --font-display: Arial, Helvetica, 'Liberation Sans', sans-serif;
   /*
    * Every numeral on the site. Tabular figures are what make a column of
    * prices line up, which is the single biggest readability win available on a
@@ -88,12 +94,13 @@ p {
   text-wrap: pretty;
 }
 
-/* Headings are Arial Black, all caps.
+/* Headings and subheadings: Arial Bold, uppercase.
    Caps need POSITIVE tracking — at the negative tracking that suits mixed-case
-   Arial Black, capitals jam into each other and stop being readable. */
+   Arial, capitals jam into each other and stop being readable. */
 h1,
 h2,
 h3,
+h4,
 .display {
   font-family: var(--font-display);
   font-weight: 700;
@@ -108,7 +115,7 @@ h3,
   letter-spacing: -0.01em;
 }
 
-/* The wordmark's own treatment: heavy, italic, wide-tracked. Used sparingly. */
+/* The wordmark's own treatment: Arial Bold, italic. Used sparingly. */
 .wordmark {
   font-family: var(--font-display);
   font-style: italic;

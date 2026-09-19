@@ -64,6 +64,8 @@ export interface PlanView {
   readonly lifetimeCapDescription: string;
   readonly lifetimeCapResolved: boolean;
   readonly trailingStopAt: SerialisedMoney;
+  /** Where the trailing floor STARTS: starting balance minus the allowance. */
+  readonly initialThreshold: SerialisedMoney;
   /** The exact balance at which the first withdrawal becomes available. */
   readonly firstWithdrawalAt: SerialisedMoney;
   readonly firstWithdrawalGross: SerialisedMoney;
@@ -282,6 +284,7 @@ function buildPlanView(plan: PlanDefinition): PlanView {
       : describeLifetimeCap(plan.lifetimeCashCap),
     lifetimeCapResolved: !lifetimeCapBlocksProductionSale(plan.lifetimeCashCap),
     trailingStopAt: serialiseMoney(plan.startingBalance.plus(TRAILING_STOP_OFFSET.value)),
+    initialThreshold: serialiseMoney(plan.startingBalance.minus(plan.drawdownAllowance.value)),
     firstWithdrawalAt: serialiseMoney(firstWithdrawalAt),
     firstWithdrawalGross: serialiseMoney(minimumGross),
     firstWithdrawalCash: serialiseMoney(minimumGross.halfExact()),
