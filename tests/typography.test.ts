@@ -82,3 +82,45 @@ describe('case and weight', () => {
     expect(css).toContain('font-variant-numeric: tabular-nums slashed-zero');
   });
 });
+
+/**
+ * The dashboard hero.
+ *
+ * It leads with room to the floor rather than the account balance, and that is
+ * a deliberate choice worth defending against a future edit: a simulated
+ * balance is not cash and tells a trader nothing about whether the next trade
+ * can end their account.
+ */
+describe('dashboard hero', () => {
+  const hero = read('src/components/DashboardHero.tsx');
+  const page = read('src/app/dashboard/page.tsx');
+
+  it('leads with room to the floor', () => {
+    expect(hero).toContain('Room to the floor');
+    // Before the status card, which is provenance rather than a decision.
+    expect(page.indexOf('<DashboardHero')).toBeLessThan(page.indexOf('---- status ----'));
+  });
+
+  it('never shows a bar without the figures beside it', () => {
+    // Every meter carries a text label, and each caller prints the real values.
+    expect(hero).toContain('role="meter"');
+    expect(hero).toContain('aria-valuenow');
+    expect(hero).toMatch(/aria-label=\{label\}/);
+  });
+
+  it('never tells an account that cannot trade how close it is to a payout', () => {
+    expect(page).toContain('!account.isTradeable');
+    expect(page).toMatch(/kind: 'blocked'/);
+  });
+
+  it('says so when the figures are not current, rather than showing them plainly', () => {
+    expect(hero).toContain('These figures are not current');
+  });
+
+  it('warns about staleness exactly once', () => {
+    // It used to appear in the status card as well, which trained people to
+    // skip both.
+    const occurrences = page.match(/not current/g) ?? [];
+    expect(occurrences.length).toBeLessThanOrEqual(1);
+  });
+});

@@ -8,6 +8,7 @@ import { Badge, Callout, Card, DataRow, StatusDot } from '@/components/ui';
 import { checkPayoutProfile } from '@/domain/customer/profile';
 import { prisma } from '@/server/db';
 import { PayoutRequestForm } from '@/components/PayoutRequestForm';
+import { DashboardHero } from '@/components/DashboardHero';
 import { ResetCard, type ResetOfferView } from '@/components/ResetCard';
 import { getResetOffer } from '@/server/services/reset-service';
 import { getConfig } from '@/server/config';
@@ -120,6 +121,47 @@ export default async function DashboardPage({
         )
       : 0;
 
+  // Room as a share of the allowance. With no stop on the trailing threshold
+  // the allowance IS the maximum room, so this is a true 0-100 rather than a
+  // ratio against an arbitrary ceiling.
+  const allowanceDecimal = Number(account.drawdownAllowance.decimal);
+  const roomPercent =
+    allowanceDecimal > 0
+      ? Math.max(
+          0,
+          Math.min(100, Math.round((Number(account.trailingRoom.decimal) / allowanceDecimal) * 100)),
+        )
+      : 0;
+
+  // What the payout card leads with. Eligible is the only case that shows a
+  // cash figure; everything else says why not, in the engine's own words
+  // rather than a cheerful placeholder.
+  const payoutHeadline: React.ComponentProps<typeof DashboardHero>['payout'] =
+    account.payoutEligible
+      ? {
+          kind: 'available',
+          cash: account.maxCash.display,
+          gross: account.maxGross.display,
+        }
+      : // An account that cannot trade is never "climbing" towards a payout,
+        // and showing it a target it can no longer reach would be the cruellest
+        // possible reading of the word "next".
+        !account.isTradeable
+        ? {
+            kind: 'blocked',
+            reason:
+              account.statusReason ??
+              'This account cannot trade, so no further payout can be earned on it.',
+          }
+        : account.firstWithdrawal.reached
+          ? { kind: 'blocked', reason: account.payoutExplanation }
+          : {
+              kind: 'climbing',
+              remaining: account.firstWithdrawal.remaining.display,
+              target: account.firstWithdrawal.targetBalance.display,
+              percent: account.firstWithdrawal.percent,
+            };
+
   // Checked here so the prompt appears while there is still time to act on it,
   // rather than at the moment a payout is refused.
   const customerProfile = await prisma.customerProfile.findUnique({
@@ -207,6 +249,27 @@ export default async function DashboardPage({
         </nav>
       )}
 
+      {/* --------------------------- the hero ---------------------------
+          The four numbers that decide whether the next trade is safe, above
+          everything else on the page. The detail cards below are still there
+          for anyone who wants to check the arithmetic; this is what the page
+          is for. */}
+      <DashboardHero
+        room={{ display: account.trailingRoom.display }}
+        allowance={{ display: account.drawdownAllowance.display }}
+        threshold={{ display: account.trailingThreshold.display }}
+        roomPercent={roomPercent}
+        dailyUsed={{ display: account.dailyLossUsed.display }}
+        dailyLimit={{ display: account.dailyLossLimit.display }}
+        dailyRemaining={{ display: account.dailyLossRemaining.display }}
+        dailyPercent={dailyUsedPercent}
+        contractsHeld={account.exposureMicroEquivalents}
+        contractsCap={account.exposureCap}
+        payout={payoutHeadline}
+        tradeable={account.isTradeable}
+        stale={account.dataStale}
+      />
+
       {/* ---------------------------- status ---------------------------- */}
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -248,16 +311,6 @@ export default async function DashboardPage({
               })}{' '}
               ET. Your daily allowance refreshes at the session roll an hour earlier, but the
               market is closed until then.
-            </Callout>
-          </div>
-        )}
-
-        {account.dataStale && (
-          <div className="mt-4">
-            <Callout tone="warn" title="Account data is not current">
-              We have not received fresh authoritative data for this account. Payout requests and
-              new exposure are blocked until it reconciles. The figures below are the last ones we
-              could verify — they may not reflect your account right now.
             </Callout>
           </div>
         )}
