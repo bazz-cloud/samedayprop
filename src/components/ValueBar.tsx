@@ -16,7 +16,7 @@ export function ValueBar() {
         <p className="display text-center text-[13px] sm:text-sm uppercase tracking-tight text-fg">
           No consistency.{' '}
           <span className="text-accent">No evaluation.</span>{' '}
-          Simple same-day payout rules.
+          No minimum trading days.
         </p>
         <Link
           href="/accounts"
