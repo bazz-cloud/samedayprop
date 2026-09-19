@@ -109,7 +109,7 @@ export async function runProvisioning(orderId: string): Promise<ProvisionOutcome
         {
           startingBalance: rules.startingBalance,
           drawdownAllowance: rules.drawdownAllowance,
-          stopOffset: rules.trailingStopOffset,
+          stopAt: rules.trailingStopAt,
         },
         rules.startingBalance,
       );

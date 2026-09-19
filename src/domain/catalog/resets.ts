@@ -175,16 +175,12 @@ export interface ResetOutcome {
  * where the threshold legitimately moves DOWN, and it does so only because the
  * trader has bought a new starting position.
  */
-export function computeResetState(
-  plan: PlanDefinition,
-  trailingStopOffset: Money,
-): ResetOutcome {
+export function computeResetState(plan: PlanDefinition, trailingStopAt: Money | null): ResetOutcome {
   const starting = plan.startingBalance;
-  const cap = starting.plus(trailingStopOffset);
   const trailing = starting.minus(plan.drawdownAllowance.value);
   return {
     restoredBalance: starting,
     restoredHighWater: starting,
-    restoredThreshold: Money.min(cap, trailing),
+    restoredThreshold: trailingStopAt === null ? trailing : Money.min(trailingStopAt, trailing),
   };
 }

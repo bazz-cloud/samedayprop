@@ -16,7 +16,7 @@
 
 import { prisma } from '@/server/db';
 import { Money } from '@/domain/money/money';
-import { getPlan, TRAILING_STOP_OFFSET, type PlanKey } from '@/domain/catalog/plans';
+import { getPlan, trailingStopFor, type PlanKey } from '@/domain/catalog/plans';
 import {
   checkResetEligibility,
   computeResetState,
@@ -143,7 +143,7 @@ export async function applyReset(input: {
 
   const planKey = account.planVersion.planKey as PlanKey;
   const plan = getPlan(planKey);
-  const restored = computeResetState(plan, TRAILING_STOP_OFFSET.value);
+  const restored = computeResetState(plan, trailingStopFor(plan));
 
   const previousBalance = Money.fromMinor(account.balanceMinor);
   const delta = restored.restoredBalance.minus(previousBalance);

@@ -14,7 +14,8 @@ import { prisma } from '@/server/db';
 import { Money } from '@/domain/money/money';
 import {
   PLANS,
-  TRAILING_STOP_OFFSET,
+  TRAILING_STOP_POLICY,
+  trailingStopFor,
   planLaunchBlockers,
   type PlanDefinition,
   type PlanKey,
@@ -33,7 +34,7 @@ function requirementStatusMap(plan: PlanDefinition): Record<string, string> {
     lifetimeCashCap: lifetimeCapBlocksProductionSale(plan.lifetimeCashCap)
       ? 'UNRESOLVED'
       : 'CONFIRMED',
-    trailingStopOffset: TRAILING_STOP_OFFSET.status,
+    trailingStopPolicy: TRAILING_STOP_POLICY.status,
   };
 }
 
@@ -111,7 +112,7 @@ export async function publishCatalogIfEmpty(): Promise<{ plans: number; addons: 
         dailyLossLimitMinor: plan.dailyLossLimit.value.minor,
         retainedBufferMinor: plan.retainedBuffer.value.minor,
         dailyCashCapMinor: plan.dailyCashPayoutCap.value.minor,
-        trailingStopOffsetMinor: TRAILING_STOP_OFFSET.value.minor,
+        trailingStopAtMinor: trailingStopFor(plan)?.minor ?? null,
         ...lifetimeCapColumns(plan),
         requirementStatuses: JSON.stringify(requirementStatusMap(plan)),
         launchBlockers: JSON.stringify(blockers),
@@ -170,7 +171,7 @@ function termsFingerprint(plan: PlanDefinition): string {
     dailyLossLimitMinor: plan.dailyLossLimit.value.minor.toString(),
     retainedBufferMinor: plan.retainedBuffer.value.minor.toString(),
     dailyCashCapMinor: plan.dailyCashPayoutCap.value.minor.toString(),
-    trailingStopOffsetMinor: TRAILING_STOP_OFFSET.value.minor.toString(),
+    trailingStopAtMinor: trailingStopFor(plan)?.minor.toString() ?? null,
     lifetimeCapKind: caps.lifetimeCapKind,
     lifetimeCapMinor: caps.lifetimeCapMinor?.toString() ?? null,
     requirementStatuses: requirementStatusMap(plan),
@@ -186,7 +187,7 @@ function fingerprintOf(row: {
   dailyLossLimitMinor: bigint;
   retainedBufferMinor: bigint;
   dailyCashCapMinor: bigint;
-  trailingStopOffsetMinor: bigint;
+  trailingStopAtMinor: bigint | null;
   lifetimeCapKind: string;
   lifetimeCapMinor: bigint | null;
   requirementStatuses: string;
@@ -200,7 +201,7 @@ function fingerprintOf(row: {
     dailyLossLimitMinor: row.dailyLossLimitMinor.toString(),
     retainedBufferMinor: row.retainedBufferMinor.toString(),
     dailyCashCapMinor: row.dailyCashCapMinor.toString(),
-    trailingStopOffsetMinor: row.trailingStopOffsetMinor.toString(),
+    trailingStopAtMinor: row.trailingStopAtMinor?.toString() ?? null,
     lifetimeCapKind: row.lifetimeCapKind,
     lifetimeCapMinor: row.lifetimeCapMinor?.toString() ?? null,
     requirementStatuses: JSON.parse(row.requirementStatuses) as unknown,
@@ -262,7 +263,7 @@ export async function publishCatalogRevisions(): Promise<readonly CatalogRevisio
           dailyLossLimitMinor: plan.dailyLossLimit.value.minor,
           retainedBufferMinor: plan.retainedBuffer.value.minor,
           dailyCashCapMinor: plan.dailyCashPayoutCap.value.minor,
-          trailingStopOffsetMinor: TRAILING_STOP_OFFSET.value.minor,
+          trailingStopAtMinor: trailingStopFor(plan)?.minor ?? null,
           ...lifetimeCapColumns(plan),
           requirementStatuses: JSON.stringify(requirementStatusMap(plan)),
           launchBlockers: JSON.stringify(blockers),
@@ -303,7 +304,8 @@ export interface PlanRuleSnapshot {
   readonly dailyLossLimit: Money;
   readonly retainedBuffer: Money;
   readonly dailyCashCap: Money;
-  readonly trailingStopOffset: Money;
+  /** Where the threshold stops rising, or null when it never stops. */
+  readonly trailingStopAt: Money | null;
   readonly lifetimeCapKind: string;
   readonly lifetimeCap: Money | null;
   readonly requirementStatuses: Record<string, string>;
@@ -323,7 +325,7 @@ export function toRuleSnapshot(version: {
   dailyLossLimitMinor: bigint;
   retainedBufferMinor: bigint;
   dailyCashCapMinor: bigint;
-  trailingStopOffsetMinor: bigint;
+  trailingStopAtMinor: bigint | null;
   lifetimeCapKind: string;
   lifetimeCapMinor: bigint | null;
   requirementStatuses: string;
@@ -341,7 +343,8 @@ export function toRuleSnapshot(version: {
     dailyLossLimit: Money.fromMinor(version.dailyLossLimitMinor),
     retainedBuffer: Money.fromMinor(version.retainedBufferMinor),
     dailyCashCap: Money.fromMinor(version.dailyCashCapMinor),
-    trailingStopOffset: Money.fromMinor(version.trailingStopOffsetMinor),
+    trailingStopAt:
+      version.trailingStopAtMinor === null ? null : Money.fromMinor(version.trailingStopAtMinor),
     lifetimeCapKind: version.lifetimeCapKind,
     // An UNRESOLVED cap never yields a usable number: callers must gate on kind.
     lifetimeCap:

@@ -531,14 +531,34 @@ describe('risk ingestion', () => {
       snapshotAt(externalAccountId, '52500.00', 11n, { unrealised: usd('500.00') }),
     );
     const afterPeak = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
-    expect(Money.fromMinor(afterPeak.thresholdMinor).toDecimalString()).toBe('50100.00');
+    // H - D, with no stop: 52,500 - 1,800.
+    expect(Money.fromMinor(afterPeak.thresholdMinor).toDecimalString()).toBe('50700.00');
 
-    await ingestSnapshot(accountId, snapshotAt(externalAccountId, '50500.00', 12n));
+    await ingestSnapshot(accountId, snapshotAt(externalAccountId, '52000.00', 12n));
     const afterGiveBack = await prisma.tradingAccount.findUniqueOrThrow({
       where: { id: accountId },
     });
-    expect(Money.fromMinor(afterGiveBack.thresholdMinor).toDecimalString()).toBe('50100.00');
+    expect(Money.fromMinor(afterGiveBack.thresholdMinor).toDecimalString()).toBe('50700.00');
     expect(Money.fromMinor(afterGiveBack.highWaterMinor).toDecimalString()).toBe('52500.00');
+    expect(afterGiveBack.tradingStatus).toBe('ACTIVE');
+  });
+
+  it('records a TERMINAL breach, not a daily pause, when one snapshot trips both', () => {
+    // Two things pinned here. First: under the retired "stops at S + $100" rule
+    // an account that ran to 52,500 could fall back to 50,500 without breaching,
+    // because the threshold had stopped at 50,100; with no stop the threshold is
+    // at 50,700 and that same give-back ends the account. Second: a $2,000
+    // give-back also blows the $595 daily limit, so BOTH breaches fire from one
+    // snapshot — and the terminal one must win, or an account that has lost
+    // access permanently would come back after the lockout expires.
+    return (async () => {
+      const { accountId, externalAccountId } = await provisionAccount();
+      await ingestSnapshot(accountId, snapshotAt(externalAccountId, '52500.00', 21n));
+      await ingestSnapshot(accountId, snapshotAt(externalAccountId, '50500.00', 22n));
+      const account = await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } });
+      expect(account.tradingStatus).toBe('BREACHED');
+      expect(account.breachReason).toMatch(/drawdown/i);
+    })();
   });
 
   it('ignores duplicate and out-of-order provider events', async () => {
@@ -766,29 +786,39 @@ describe('payouts end to end', () => {
       data: { lifetimeCapKind: 'APPROVED_UNCAPPED', lifetimeCapMinor: null },
     });
 
-    // The $50K daily cash cap is $1,500, i.e. $3,000 gross.
+    // The $50K daily cash cap is $1,500, i.e. $3,000 gross — but with no stop on
+    // the trailing threshold, one request can never exceed the $1,800 allowance.
+    // Reaching the daily cap therefore takes several requests with fresh highs
+    // between them, which is exactly what this exercises.
     const first = await requestPayout({
       userId,
       tradingAccountId: accountId,
-      gross: usd('2000.00'),
+      gross: usd('1400.00'), // $700 cash
       idempotencyKey: `cap-a-${accountId}`,
     });
     expect(first.created).toBe(true);
+
+    // A new high refreshes the room, but not the day's cash capacity: $800 of
+    // cash is left, so an $1,800 gross request ($900 cash) must be refused.
+    const externalId = (
+      await prisma.tradingAccount.findUniqueOrThrow({ where: { id: accountId } })
+    ).externalAccountId!;
+    await ingestSnapshot(accountId, snapshotAt(externalId, '62000.00', 71n));
 
     await expect(
       requestPayout({
         userId,
         tradingAccountId: accountId,
-        gross: usd('2000.00'),
+        gross: usd('1800.00'),
         idempotencyKey: `cap-b-${accountId}`,
       }),
     ).rejects.toThrow(PayoutError);
 
-    // A request that fits the remaining $500 cash / $1,000 gross succeeds.
+    // A request that fits the remaining $800 cash / $1,600 gross succeeds.
     const third = await requestPayout({
       userId,
       tradingAccountId: accountId,
-      gross: usd('1000.00'),
+      gross: usd('1600.00'),
       idempotencyKey: `cap-c-${accountId}`,
     });
     expect(third.created).toBe(true);
@@ -1202,7 +1232,7 @@ describe('withdrawing a plan from sale', () => {
         dailyLossLimitMinor: usd('900.00').minor,
         retainedBufferMinor: usd('2500.00').minor,
         dailyCashCapMinor: usd('2000.00').minor,
-        trailingStopOffsetMinor: usd('100.00').minor,
+        trailingStopAtMinor: null,
         requirementStatuses: '{}',
         launchBlockers: '[]',
         sellableInProduction: true,

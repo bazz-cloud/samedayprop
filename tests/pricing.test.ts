@@ -299,6 +299,27 @@ describe('scaled withdrawal example', () => {
     }
   });
 
+  it('never shows an example larger than one request can actually take', () => {
+    // The trailing threshold has no stop, so room above it never exceeds the
+    // drawdown allowance and that, not the daily cap, bounds a single request.
+    // An example above it would be a withdrawal the system would refuse.
+    for (const view of views) {
+      const gross = Money.fromMinor(BigInt(view.exampleWithdrawalGross.minor));
+      const ceiling = Money.fromMinor(BigInt(view.maxSingleWithdrawalGross.minor));
+      expect(gross.lte(ceiling)).toBe(true);
+    }
+  });
+
+  it('publishes a single-request ceiling below the daily cash cap on every tier', () => {
+    // If this ever flips, the daily cap becomes reachable in one request and the
+    // explanation on /payouts is wrong.
+    for (const view of views) {
+      const ceilingCash = Money.fromMinor(BigInt(view.maxSingleWithdrawalCash.minor));
+      const dailyCap = Money.fromMinor(BigInt(view.dailyCashCap.minor));
+      expect(ceilingCash.lt(dailyCap)).toBe(true);
+    }
+  });
+
   it('keeps the example payable: whole dollars, exactly halvable, and reachable', () => {
     for (const view of views) {
       const gross = Money.fromMinor(BigInt(view.exampleWithdrawalGross.minor));

@@ -365,7 +365,12 @@ export default async function DashboardPage({
               />
               <DataRow
                 label="Threshold stops rising at"
-                value={account.trailingStopsAt.display}
+                value={account.trailingStopsAt?.display ?? 'It never stops'}
+                hint={
+                  account.trailingStopsAt
+                    ? undefined
+                    : 'It follows your highest equity for the life of the account, so your room above it is never more than your drawdown allowance.'
+                }
               />
             </dl>
           </Card>

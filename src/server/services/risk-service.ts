@@ -151,7 +151,7 @@ export async function ingestSnapshot(
   const trailingParams: TrailingParams = {
     startingBalance: Money.fromMinor(account.startingBalanceMinor),
     drawdownAllowance: rules.drawdownAllowance,
-    stopOffset: rules.trailingStopOffset,
+    stopAt: rules.trailingStopAt,
   };
 
   // ---- session roll --------------------------------------------------------
@@ -276,7 +276,15 @@ export async function ingestSnapshot(
   });
 
   // ---- enforcement ---------------------------------------------------------
-  for (const breach of breaches) {
+  // A trailing breach is TERMINAL; a daily-loss breach is a timed lockout. When
+  // one snapshot trips both — which is the common case, since a give-back large
+  // enough to reach the threshold is usually also larger than the daily limit —
+  // the terminal one has to win. Enforcing the lockout first and the breach last
+  // gets the ordering right, and `enforceBreach` additionally refuses to
+  // downgrade an account that is already BREACHED, so the outcome does not
+  // depend on this sort.
+  const ordered = [...breaches].sort((a, b) => (a === 'DAILY_LOSS' ? -1 : b === 'DAILY_LOSS' ? 1 : 0));
+  for (const breach of ordered) {
     await enforceBreach(tradingAccountId, breach, snapshot, trailing.threshold, sessionDate);
   }
 
@@ -424,8 +432,15 @@ async function enforceBreach(
       },
     });
 
-    await tx.tradingAccount.update({
-      where: { id: tradingAccountId },
+    // updateMany, not update, for the guard in the where clause: a daily-loss
+    // lockout must never overwrite a terminated account's status with a status
+    // that expires. Losing access permanently and being paused until 18:00 ET
+    // are different outcomes, and the harsher one is the true one.
+    await tx.tradingAccount.updateMany({
+      where:
+        breach === 'TRAILING'
+          ? { id: tradingAccountId }
+          : { id: tradingAccountId, tradingStatus: { not: 'BREACHED' } },
       data: {
         tradingStatus: breach === 'TRAILING' ? 'BREACHED' : 'DAILY_PAUSED',
         statusReason: reason,

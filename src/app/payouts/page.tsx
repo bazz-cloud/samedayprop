@@ -129,16 +129,16 @@ export default function PayoutsPage() {
                 { key: 'account', label: 'Account' },
                 { key: 'buffer', label: 'Buffer', numeric: true },
                 { key: 'first', label: 'First payout at', numeric: true },
+                { key: 'request', label: 'Most one request can pay', numeric: true },
                 { key: 'daily', label: 'Daily cash cap', numeric: true },
-                { key: 'gross', label: 'Gross equivalent', numeric: true },
                 { key: 'lifetime', label: 'Lifetime cap', numeric: true },
               ]}
               rows={plans.map((plan) => ({
                 account: plan.label,
                 buffer: plan.retainedBuffer.display,
                 first: plan.firstWithdrawalAt.display,
+                request: plan.maxSingleWithdrawalCash.display,
                 daily: <span className="text-accent font-bold">{plan.dailyCashCap.display}</span>,
-                gross: plan.dailyGrossEquivalent.display,
                 lifetime: plan.lifetimeCapDescription.split(' ')[0],
               }))}
             />
@@ -148,6 +148,17 @@ export default function PayoutsPage() {
           Capacity is reserved when you request, not when you are paid, so several requests share the
           same day&rsquo;s cap and a pending request keeps counting against the day it was made.
         </p>
+        <div className="rounded-xl border border-border-strong bg-card p-5">
+          <p className="label">Why one request pays less than the daily cap</p>
+          <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
+            Your trailing threshold never stops rising, so it always sits one drawdown allowance
+            under your best equity. A withdrawal cannot take you to or through it. That makes your
+            allowance the ceiling on any single request, and on every account it is smaller than the
+            daily cash cap &mdash; so reaching the cap in a day takes more than one request, with
+            new profit in between. The last whole dollar of the room is also unreachable: your
+            equity has to finish above the threshold, not on it.
+          </p>
+        </div>
       </section>
 
       <section aria-labelledby="timing" className="space-y-4">

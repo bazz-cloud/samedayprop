@@ -167,7 +167,9 @@ model PlanVersion {
   dailyLossLimitMinor     BigInt
   retainedBufferMinor     BigInt
   dailyCashCapMinor       BigInt
-  trailingStopOffsetMinor BigInt
+  /// Balance at which the trailing threshold stops rising. NULL means it never
+  /// stops — an approved policy, not a missing value. See TRAILING_STOP_POLICY.
+  trailingStopAtMinor     BigInt?
 
   // UNRESOLVED | APPROVED_AMOUNT | APPROVED_UNCAPPED
   lifetimeCapKind       String    @default("UNRESOLVED")

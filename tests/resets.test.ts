@@ -3,7 +3,7 @@ import { usd } from '@/domain/money/money';
 import {
   LIFETIME_CAP_MULTIPLE_OF_DAILY_CASH_CAP,
   PLANS,
-  TRAILING_STOP_OFFSET,
+  trailingStopFor,
   getPlan,
 } from '@/domain/catalog/plans';
 import {
@@ -106,7 +106,7 @@ describe('reset eligibility', () => {
 describe('reset restores the starting position', () => {
   it('returns balance, high-water and threshold to their opening values', () => {
     const plan = getPlan('SIM_50K');
-    const state = computeResetState(plan, TRAILING_STOP_OFFSET.value);
+    const state = computeResetState(plan, trailingStopFor(plan));
     expect(state.restoredBalance.toDecimalString()).toBe('50000.00');
     expect(state.restoredHighWater.toDecimalString()).toBe('50000.00');
     // S - D, the same threshold a freshly purchased account opens with.
@@ -115,7 +115,7 @@ describe('reset restores the starting position', () => {
 
   it('gives the same opening threshold a new account would have', () => {
     for (const plan of PLANS) {
-      const state = computeResetState(plan, TRAILING_STOP_OFFSET.value);
+      const state = computeResetState(plan, trailingStopFor(plan));
       const fresh = plan.startingBalance.minus(plan.drawdownAllowance.value);
       expect(state.restoredThreshold.equals(fresh)).toBe(true);
     }

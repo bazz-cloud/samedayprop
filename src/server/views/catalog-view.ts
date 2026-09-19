@@ -11,8 +11,9 @@ import { Money } from '@/domain/money/money';
 import {
   GROSS_WITHDRAWAL_INCREMENT,
   MINIMUM_GROSS_WITHDRAWAL,
+  MIN_POST_WITHDRAWAL_ROOM,
   PLANS,
-  TRAILING_STOP_OFFSET,
+  trailingStopFor,
   couponPrice,
   planLaunchBlockers,
   type PlanDefinition,
@@ -63,11 +64,22 @@ export interface PlanView {
   readonly dailyGrossEquivalent: SerialisedMoney;
   readonly lifetimeCapDescription: string;
   readonly lifetimeCapResolved: boolean;
-  readonly trailingStopAt: SerialisedMoney;
+  /** Where the threshold stops rising, or null when it never stops. */
+  readonly trailingStopAt: SerialisedMoney | null;
   /** Where the trailing floor STARTS: starting balance minus the allowance. */
   readonly initialThreshold: SerialisedMoney;
   /** The exact balance at which the first withdrawal becomes available. */
   readonly firstWithdrawalAt: SerialisedMoney;
+  /**
+   * The most a single request can ever pay in cash.
+   *
+   * With no stop on the trailing threshold, room above it never exceeds the
+   * drawdown allowance, so the allowance — not the daily cash cap — is what
+   * bounds one request. Published because a cap a trader cannot reach would
+   * otherwise read as a promise.
+   */
+  readonly maxSingleWithdrawalGross: SerialisedMoney;
+  readonly maxSingleWithdrawalCash: SerialisedMoney;
   readonly firstWithdrawalGross: SerialisedMoney;
   readonly firstWithdrawalCash: SerialisedMoney;
   readonly firstWithdrawalLeaves: SerialisedMoney;
@@ -114,6 +126,15 @@ function buildPlanView(plan: PlanDefinition): PlanView {
     .plus(minimumGross);
   const firstWithdrawalLeaves = firstWithdrawalAt.minus(minimumGross);
 
+  // The ceiling one request can ever reach: the whole drawdown allowance is the
+  // widest the room ever gets, and a withdrawal may not land ON the threshold,
+  // so the last whole dollar is unreachable.
+  const maxSingleWithdrawal = trailingStopFor(plan) === null
+    ? plan.drawdownAllowance.value
+        .minus(MIN_POST_WITHDRAWAL_ROOM.value)
+        .floorToIncrement(GROSS_WITHDRAWAL_INCREMENT.value)
+    : plan.dailyCashPayoutCap.value.timesInt(2);
+
   // The scaled example: 2% of the nominal account size, rounded down to a whole
   // $500 so it reads as a round number, floored at the published minimum and
   // capped at one day's gross capacity so the example is a withdrawal that could
@@ -126,11 +147,13 @@ function buildPlanView(plan: PlanDefinition): PlanView {
       minimumGross,
     ),
     plan.dailyCashPayoutCap.value.timesInt(2),
+    maxSingleWithdrawal,
   );
   const exampleWithdrawalAt = plan.startingBalance
     .plus(plan.retainedBuffer.value)
     .plus(exampleGross);
   const exampleWithdrawalLeaves = exampleWithdrawalAt.minus(exampleGross);
+
 
   const rules: RuleLine[] = [
     {
@@ -183,10 +206,11 @@ function buildPlanView(plan: PlanDefinition): PlanView {
       detail:
         'Your threshold follows your highest observed equity through the day, INCLUDING ' +
         'unrealized gains on open positions. It never moves back down after a loss or a ' +
-        `withdrawal. It stops rising once it reaches ${plan.startingBalance
-          .plus(TRAILING_STOP_OFFSET.value)
-          .format()}. Equity touching the threshold is a maximum drawdown breach and ends trading ` +
-        'access on this account.',
+        'withdrawal, and it never stops rising: it keeps following your highest equity for as ' +
+        'long as the account is open. Because of that, the room between your balance and your ' +
+        `threshold is never more than ${plan.drawdownAllowance.value.format()}, and that room ` +
+        'is also the most any one withdrawal can take. Equity touching the threshold is a ' +
+        'maximum drawdown breach and ends trading access on this account.',
       status: plan.drawdownAllowance.status,
     },
     {
@@ -315,9 +339,14 @@ function buildPlanView(plan: PlanDefinition): PlanView {
       ? 'Not yet decided'
       : describeLifetimeCap(plan.lifetimeCashCap),
     lifetimeCapResolved: !lifetimeCapBlocksProductionSale(plan.lifetimeCashCap),
-    trailingStopAt: serialiseMoney(plan.startingBalance.plus(TRAILING_STOP_OFFSET.value)),
+    trailingStopAt: (() => {
+      const stop = trailingStopFor(plan);
+      return stop === null ? null : serialiseMoney(stop);
+    })(),
     initialThreshold: serialiseMoney(plan.startingBalance.minus(plan.drawdownAllowance.value)),
     firstWithdrawalAt: serialiseMoney(firstWithdrawalAt),
+    maxSingleWithdrawalGross: serialiseMoney(maxSingleWithdrawal),
+    maxSingleWithdrawalCash: serialiseMoney(maxSingleWithdrawal.halfExact()),
     firstWithdrawalGross: serialiseMoney(minimumGross),
     firstWithdrawalCash: serialiseMoney(minimumGross.halfExact()),
     firstWithdrawalLeaves: serialiseMoney(firstWithdrawalLeaves),

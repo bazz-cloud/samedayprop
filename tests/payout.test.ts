@@ -5,7 +5,7 @@ import {
   GROSS_WITHDRAWAL_INCREMENT,
   MINIMUM_GROSS_WITHDRAWAL,
   MIN_POST_WITHDRAWAL_ROOM,
-  TRAILING_STOP_OFFSET,
+  trailingStopFor,
 } from '@/domain/catalog/plans';
 import {
   cashForGross,
@@ -44,13 +44,13 @@ function contextAt(
   let trailing = initialTrailingState({
     startingBalance: plan.startingBalance,
     drawdownAllowance: plan.drawdownAllowance.value,
-    stopOffset: TRAILING_STOP_OFFSET.value,
+    stopAt: trailingStopFor(plan),
   });
   trailing = applyEquityObservation(
     {
       startingBalance: plan.startingBalance,
       drawdownAllowance: plan.drawdownAllowance.value,
-      stopOffset: TRAILING_STOP_OFFSET.value,
+      stopAt: trailingStopFor(plan),
     },
     trailing,
     usd(balance),
@@ -98,16 +98,23 @@ describe('the worked $50K examples from the specification', () => {
     expect(result.balanceAfter.toDecimalString()).toBe('52000.00');
   });
 
-  it('$55,000: a $3,000 gross request pays $1,500 cash and leaves $52,000', () => {
+  it('$55,000: the trailing room caps the request at $1,799 gross, paying $899.50', () => {
+    // The owner's trailing rule has no stop, so the threshold sits exactly one
+    // drawdown allowance under the peak. At a fresh high of $55,000 the room is
+    // $1,800 — less than the $3,000 the buffer would allow and less than the
+    // $3,000 the daily cash cap would allow. Room is the binding term.
+    //
+    // $1,799, not $1,800: equity must finish strictly ABOVE the threshold by at
+    // least $0.01, and gross requests are whole dollars, so the last whole
+    // dollar is unreachable by construction.
     const context = contextAt('55000.00');
     const capacity = computeCapacity(context);
-    // Buffer allows 3,000; the daily cash cap of 1,500 allows 3,000 gross too.
-    expect(capacity.maxGross.toDecimalString()).toBe('3000.00');
+    expect(capacity.maxGross.toDecimalString()).toBe('1799.00');
 
-    const result = validateRequest(context, capacity, usd('3000.00'), flatAndHealthy);
+    const result = validateRequest(context, capacity, usd('1799.00'), flatAndHealthy);
     expect(result.ok).toBe(true);
-    expect(result.cash.toDecimalString()).toBe('1500.00');
-    expect(result.balanceAfter.toDecimalString()).toBe('52000.00');
+    expect(result.cash.toDecimalString()).toBe('899.50');
+    expect(result.balanceAfter.toDecimalString()).toBe('53201.00');
   });
 
   it('threshold $50,100 with $52,000 remaining leaves $1,900 of loss allowance', () => {
@@ -158,11 +165,16 @@ describe('the 50/50 split', () => {
 });
 
 describe('capacity bounds', () => {
-  it('is bound by the daily cash cap when profit is plentiful', () => {
-    const capacity = computeCapacity(contextAt('60000.00'));
-    // Buffer allows 8,000 gross; the $1,500 daily cash cap allows only 3,000.
-    expect(capacity.maxGross.toDecimalString()).toBe('3000.00');
-    expect(capacity.maxCash.toDecimalString()).toBe('1500.00');
+  it('is bound by trailing room, not the daily cap, however plentiful the profit', () => {
+    // With no stop on the threshold, room can never exceed the drawdown
+    // allowance, so on this plan the $1,500 daily cash cap is unreachable in a
+    // single request at any balance: $899.50 is the most one request can pay.
+    // This is the arithmetic behind the note on /payouts.
+    for (const balance of ['60000.00', '75000.00', '250000.00']) {
+      const capacity = computeCapacity(contextAt(balance));
+      expect(capacity.maxGross.toDecimalString()).toBe('1799.00');
+      expect(capacity.maxCash.toDecimalString()).toBe('899.50');
+    }
   });
 
   it('is bound by remaining daily capacity after an earlier payout', () => {

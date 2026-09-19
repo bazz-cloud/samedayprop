@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Money, usd } from '@/domain/money/money';
-import { getPlan, TRAILING_STOP_OFFSET } from '@/domain/catalog/plans';
+import { getPlan, trailingStopFor, TRAILING_STOP_POLICY } from '@/domain/catalog/plans';
 import {
   applyEquityObservation,
   applyWithdrawalDeduction,
@@ -31,7 +31,7 @@ const plan = getPlan('SIM_50K');
 const params: TrailingParams = {
   startingBalance: plan.startingBalance,
   drawdownAllowance: plan.drawdownAllowance.value,
-  stopOffset: TRAILING_STOP_OFFSET.value,
+  stopAt: trailingStopFor(plan),
 };
 
 describe('intraday trailing drawdown', () => {
@@ -60,35 +60,38 @@ describe('intraday trailing drawdown', () => {
     expect(state.threshold.toDecimalString()).toBe('49700.00');
   });
 
-  it('stops rising at starting balance + $100', () => {
+  it('keeps rising however far equity runs, because the policy has no stop', () => {
     let state = initialTrailingState(params);
     state = applyEquityObservation(params, state, usd('52100.00'));
-    expect(state.threshold.toDecimalString()).toBe('50100.00');
-    expect(state.thresholdIsCapped).toBe(true);
+    expect(state.threshold.toDecimalString()).toBe('50300.00');
+    expect(state.thresholdIsCapped).toBe(false);
 
-    // Further gains do not push the threshold past the cap.
+    // The old rule stopped here at 50,100. It does not any more.
     state = applyEquityObservation(params, state, usd('99000.00'));
-    expect(state.threshold.toDecimalString()).toBe('50100.00');
+    expect(state.threshold.toDecimalString()).toBe('97200.00');
+    expect(state.thresholdIsCapped).toBe(false);
   });
 
   it('never moves the threshold down after a withdrawal', () => {
     let state = initialTrailingState(params);
     state = applyEquityObservation(params, state, usd('52500.00'));
-    expect(state.threshold.toDecimalString()).toBe('50100.00');
+    expect(state.threshold.toDecimalString()).toBe('50700.00');
 
-    // $500 gross withdrawal: equity falls to 52,000, threshold holds.
+    // $1,000 gross withdrawal: equity falls to 51,500, threshold holds.
     state = applyWithdrawalDeduction(state);
-    state = applyEquityObservation(params, state, usd('52000.00'));
-    expect(state.threshold.toDecimalString()).toBe('50100.00');
+    state = applyEquityObservation(params, state, usd('51500.00'));
+    expect(state.threshold.toDecimalString()).toBe('50700.00');
     expect(state.highWater.toDecimalString()).toBe('52500.00');
   });
 
-  it('matches the worked example: threshold 50,100 with 52,000 equity leaves 1,900 room', () => {
+  it('matches the worked example: a $1,000 withdrawal at 52,500 leaves $800 of room', () => {
     let state = initialTrailingState(params);
     state = applyEquityObservation(params, state, usd('52500.00'));
-    state = applyEquityObservation(params, state, usd('52000.00'));
-    expect(state.threshold.toDecimalString()).toBe('50100.00');
-    expect(remainingTrailingRoom(state, usd('52000.00')).toDecimalString()).toBe('1900.00');
+    // At the peak the room IS the allowance, which is the widest it ever gets.
+    expect(remainingTrailingRoom(state, usd('52500.00')).toDecimalString()).toBe('1800.00');
+    state = applyEquityObservation(params, state, usd('51500.00'));
+    expect(state.threshold.toDecimalString()).toBe('50700.00');
+    expect(remainingTrailingRoom(state, usd('51500.00')).toDecimalString()).toBe('800.00');
   });
 
   it('breaches when equity touches the threshold, not only when it goes below', () => {
@@ -112,10 +115,17 @@ describe('intraday trailing drawdown', () => {
     }
   });
 
-  it('computes the threshold as min(S + stop, H - D)', () => {
+  it('computes the threshold as H - D, with no upper stop', () => {
     expect(computeThreshold(params, usd('50000.00')).toDecimalString()).toBe('48200.00');
     expect(computeThreshold(params, usd('51000.00')).toDecimalString()).toBe('49200.00');
-    expect(computeThreshold(params, usd('60000.00')).toDecimalString()).toBe('50100.00');
+    expect(computeThreshold(params, usd('60000.00')).toDecimalString()).toBe('58200.00');
+  });
+
+  it('still honours a stop when one is configured, so the policy is not hard-coded', () => {
+    const stopped = { ...params, stopAt: usd('50100.00') };
+    expect(computeThreshold(stopped, usd('60000.00')).toDecimalString()).toBe('50100.00');
+    const state = applyEquityObservation(stopped, initialTrailingState(stopped), usd('60000.00'));
+    expect(state.thresholdIsCapped).toBe(true);
   });
 });
 
@@ -333,10 +343,25 @@ describe('plan risk parameters carry their approval status', () => {
     expect(plan.dailyCashPayoutCap.status).toBe('CONFIRMED');
   });
 
-  it('leaves the derived controls proposed, since the owner approved commercial terms', () => {
-    // The trailing stop offset was introduced during implementation rather than
-    // supplied as a commercial term, so it is not covered by that approval.
-    expect(TRAILING_STOP_OFFSET.status).toBe('PROPOSED');
+  it('carries the owner-approved trailing stop policy', () => {
+    // Owner decision, 2026-09-19: the threshold never stops rising. Recorded as
+    // an approved policy rather than an absent offset, so "no stop" cannot be
+    // mistaken for "nobody set one".
+    expect(TRAILING_STOP_POLICY.status).toBe('CONFIRMED');
+    expect(TRAILING_STOP_POLICY.value.kind).toBe('never-stops');
+    expect(trailingStopFor(getPlan('SIM_50K'))).toBeNull();
+  });
+
+  it('never gives more room than the drawdown allowance, at any balance', () => {
+    // The consequence of having no stop, asserted rather than assumed: this is
+    // what caps every withdrawal on the account.
+    let state = initialTrailingState(params);
+    for (const equity of ['50800.00', '53000.00', '61000.00', '250000.00']) {
+      state = applyEquityObservation(params, state, usd(equity));
+      const room = usd(equity).minus(state.threshold);
+      expect(room.equals(plan.drawdownAllowance.value)).toBe(true);
+      expect(state.thresholdIsCapped).toBe(false);
+    }
   });
 
   it('confirms every position ceiling, including the $300K that was interpolated', () => {

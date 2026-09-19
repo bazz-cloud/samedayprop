@@ -59,7 +59,7 @@ export const FAQS: readonly FaqEntry[] = [
   },
   {
     q: 'Does my trailing threshold go back down if I give back profit?',
-    a: 'No. It follows your highest equity upward, including unrealized gains, and never moves back down. It stops rising at your starting balance plus $100.',
+    a: 'No. It follows your highest equity upward, including unrealized gains, and never moves back down. It also never stops rising, so the gap between your balance and your threshold is never wider than your drawdown allowance.',
     link: { href: '/rules#drawdown', label: 'See the diagram' },
   },
   {

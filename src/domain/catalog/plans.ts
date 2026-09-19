@@ -56,12 +56,47 @@ export interface PlanDefinition {
 }
 
 /** Trailing threshold stops rising once it reaches starting balance + this. */
-export const TRAILING_STOP_OFFSET: Governed<Money> = proposed(
-  usd('100.00'),
-  'Trailing threshold stops at starting balance + $100, locking in a small buffer. ' +
-    'Keep configurable and versioned; approval required before production sale.',
-  'Build prompt §2 proposed defaults',
+/**
+ * Whether the trailing threshold ever stops following the high-water mark.
+ *
+ * A three-way decision rather than a nullable offset, for the same reason the
+ * lifetime cap is: "no stop" is a commercial choice with consequences, not the
+ * absence of a setting, and it must be something the owner affirmatively chose.
+ *
+ * OWNER DECISION, 2026-09-19: the threshold NEVER stops rising. It follows the
+ * highest equity the account has ever shown, for the life of the account, and
+ * never moves back down. Two consequences follow arithmetically and are
+ * documented in docs/DECISIONS.md:
+ *
+ *  1. Room above the threshold can never exceed the drawdown allowance D, so no
+ *     single withdrawal can exceed D gross (D/2 in cash) however large the
+ *     balance grows. The published daily cash cap is a ceiling that the trailing
+ *     rule binds before it is reached.
+ *  2. A withdrawal that takes the full available room leaves the account sitting
+ *     just above its threshold, because the threshold does not follow the
+ *     balance down. The payout page says so.
+ */
+export type TrailingStopPolicy =
+  | { readonly kind: 'never-stops' }
+  | { readonly kind: 'stops-at-offset'; readonly offset: Money };
+
+export const TRAILING_STOP_POLICY: Governed<TrailingStopPolicy> = confirmed(
+  { kind: 'never-stops' },
+  'The trailing threshold follows the high-water mark for the life of the account and ' +
+    'never stops rising.',
+  'Owner decision 2026-09-19',
 );
+
+/**
+ * The stop point for a plan, or null when the threshold never stops.
+ *
+ * Null here is derived from an approved policy, never a missing setting — the
+ * policy above is what carries the approval.
+ */
+export function trailingStopFor(plan: { startingBalance: Money }): Money | null {
+  const policy = TRAILING_STOP_POLICY.value;
+  return policy.kind === 'never-stops' ? null : plan.startingBalance.plus(policy.offset);
+}
 
 /** Trader share of eligible rewards. CONFIRMED at 50%. */
 export const TRADER_SHARE_NUMERATOR = 1n;
@@ -278,11 +313,11 @@ export function planLaunchBlockers(plan: PlanDefinition): LaunchBlocker[] {
     });
   }
 
-  if (TRAILING_STOP_OFFSET.status !== 'CONFIRMED') {
+  if (TRAILING_STOP_POLICY.status !== 'CONFIRMED') {
     blockers.push({
-      field: 'trailingStopOffset',
-      status: TRAILING_STOP_OFFSET.status,
-      detail: TRAILING_STOP_OFFSET.note ?? 'Trailing stop policy requires approval.',
+      field: 'trailingStopPolicy',
+      status: TRAILING_STOP_POLICY.status,
+      detail: TRAILING_STOP_POLICY.note ?? 'Trailing stop policy requires approval.',
     });
   }
 

@@ -17,7 +17,7 @@
 import { PrismaClient } from '../src/generated/prisma';
 import { hashPassword } from '../src/server/auth/passwords';
 import { LEGAL_DOCUMENT_DRAFTS, hashDocumentBody } from '../src/server/legal/documents';
-import { PLANS, TRAILING_STOP_OFFSET } from '../src/domain/catalog/plans';
+import { PLANS, trailingStopFor } from '../src/domain/catalog/plans';
 import { computeThreshold } from '../src/domain/risk/trailing';
 import { DEFAULT_SESSION_CONFIG, nextMarketOpen, sessionDateFor } from '../src/domain/risk/session';
 import { Money, usd } from '../src/domain/money/money';
@@ -489,7 +489,7 @@ async function seedScenario(spec: ScenarioSpec, password: Awaited<ReturnType<typ
     {
       startingBalance: plan.startingBalance,
       drawdownAllowance: plan.drawdownAllowance.value,
-      stopOffset: TRAILING_STOP_OFFSET.value,
+      stopAt: trailingStopFor(plan),
     },
     highWater,
   );

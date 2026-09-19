@@ -61,19 +61,20 @@ export default function RulesPage() {
           title: 'Trailing drawdown',
           summary: 'Touch the floor and the account ends.',
           body: [
-            'A threshold follows your equity upward, including unrealized gains on open positions, and never moves back down. Once it reaches your starting balance plus $100 it stops rising.',
+            'A threshold follows your equity upward, including unrealized gains on open positions, and never moves back down. It also never stops rising — it keeps following your highest equity for as long as the account is open.',
+            'Because the threshold sits exactly one allowance below your highest equity, the room between your balance and the threshold is never more than the allowance. That room is also the ceiling on any single withdrawal.',
             'Equity touching the threshold is a breach, not only falling below it.',
           ],
           table: {
-            columns: ['Account', 'Allowance', 'Floor starts at', 'Floor stops at'],
+            columns: ['Account', 'Allowance', 'Floor starts at', 'Most room you can ever have'],
             rows: tierRows((plan) => [
               plan.drawdownAllowance.display,
               plan.initialThreshold.display,
-              plan.trailingStopAt.display,
+              plan.drawdownAllowance.display,
             ]),
           },
           caveat:
-            'A withdrawal lowers your equity without moving the threshold, so it spends the room between them.',
+            'A withdrawal lowers your equity without moving the threshold, so it spends the room between them. Take the full amount available and you will be sitting just above your threshold until you trade back up.',
         },
         {
           id: 'daily-loss',

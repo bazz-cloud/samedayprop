@@ -140,9 +140,9 @@ export function PricingFootnotes({ fiftyK }: { fiftyK: PlanView }) {
         <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
           On a <span className="tnum">{fiftyK.label}</span> account the floor starts at{' '}
           <span className="tnum">{fiftyK.initialThreshold.display}</span> and follows your highest
-          simulated balance up — it never moves back down, and it stops rising at{' '}
-          <span className="tnum">{fiftyK.trailingStopAt.display}</span>. Touch it and the account
-          ends.
+          simulated balance up. It never moves back down and it never stops rising, so it always
+          sits <span className="tnum">{fiftyK.drawdownAllowance.display}</span> below your best
+          equity. Touch it and the account ends.
         </p>
       </div>
 

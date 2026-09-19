@@ -453,7 +453,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
             dailyLossLimitMinor: planVersion.dailyLossLimitMinor.toString(),
             retainedBufferMinor: planVersion.retainedBufferMinor.toString(),
             dailyCashCapMinor: planVersion.dailyCashCapMinor.toString(),
-            trailingStopOffsetMinor: planVersion.trailingStopOffsetMinor.toString(),
+            trailingStopAtMinor: planVersion.trailingStopAtMinor?.toString() ?? null,
             lifetimeCapKind: planVersion.lifetimeCapKind,
             lifetimeCapMinor: planVersion.lifetimeCapMinor?.toString() ?? null,
             ceilingMinis: planVersion.ceilingMinis,

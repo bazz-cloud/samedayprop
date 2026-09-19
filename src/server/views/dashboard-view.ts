@@ -111,7 +111,8 @@ export interface DashboardAccount {
   readonly highWater: SerialisedMoney;
   readonly trailingThreshold: SerialisedMoney;
   readonly trailingRoom: SerialisedMoney;
-  readonly trailingStopsAt: SerialisedMoney;
+  /** Where the threshold stops rising, or null when it never stops. */
+  readonly trailingStopsAt: SerialisedMoney | null;
   readonly drawdownAllowance: SerialisedMoney;
 
   readonly exposureMicroEquivalents: number;
@@ -263,9 +264,7 @@ export async function getDashboardAccount(
     highWater: serialiseMoney(Money.fromMinor(account.highWaterMinor)),
     trailingThreshold: serialiseMoney(threshold),
     trailingRoom: serialiseMoney(room.isNegative() ? Money.zero() : room),
-    trailingStopsAt: serialiseMoney(
-      Money.fromMinor(account.startingBalanceMinor).plus(rules.trailingStopOffset),
-    ),
+    trailingStopsAt: rules.trailingStopAt === null ? null : serialiseMoney(rules.trailingStopAt),
     drawdownAllowance: serialiseMoney(rules.drawdownAllowance),
 
     exposureMicroEquivalents: positionSnapshot?.microEquivalents ?? 0,

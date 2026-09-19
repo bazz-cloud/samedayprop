@@ -8,7 +8,8 @@
  *   D = drawdown allowance for the plan
  *   H = highest observed authoritative intraday equity, net of modelled costs,
  *       initialised to S
- *   T = min(S + stopOffset, H - D)
+ *   T = H - D            (when the threshold never stops)
+ *   T = min(S + k, H - D) (when it stops at S + k)
  *
  * Two properties the rest of the system depends on, enforced here and asserted
  * in tests:
@@ -19,9 +20,14 @@
  *     a withdrawal. A withdrawal reduces equity and therefore reduces remaining
  *     room; it must not hand back drawdown room by dragging the threshold down.
  *
- * Once H - D reaches S + stopOffset the threshold stops rising, so the account
- * locks in a small profit floor rather than trailing indefinitely. That stop is
- * a PROPOSED policy and is configurable and versioned.
+ * Whether the threshold ever stops rising is a versioned commercial policy, not
+ * a constant here: `stopAt` is the balance at which it stops, or null when it
+ * never does. The owner's decision is `TRAILING_STOP_POLICY` in the catalog.
+ *
+ * With no stop, room above the threshold can never exceed D — equity is at most
+ * H, and T is exactly H - D. Every withdrawal ceiling downstream inherits that
+ * bound, which is why the payout formula carries "room above threshold" as its
+ * own term rather than trusting the daily cap alone.
  */
 
 import { Money } from '../money/money';
@@ -31,8 +37,11 @@ export interface TrailingParams {
   readonly startingBalance: Money;
   /** D — drawdown allowance. */
   readonly drawdownAllowance: Money;
-  /** Threshold stops rising at S + this. */
-  readonly stopOffset: Money;
+  /**
+   * The balance at which the threshold stops rising, or null when it never
+   * stops. Null is derived from an approved policy, never a missing setting.
+   */
+  readonly stopAt: Money | null;
 }
 
 export interface TrailingState {
@@ -40,14 +49,21 @@ export interface TrailingState {
   readonly highWater: Money;
   /** T — breach threshold. Monotonically non-decreasing. */
   readonly threshold: Money;
-  /** True once the threshold has reached its stopping point and can rise no further. */
+  /**
+   * True once the threshold has reached its stopping point and can rise no
+   * further. Always false while the policy has no stop.
+   */
   readonly thresholdIsCapped: boolean;
 }
 
 export function computeThreshold(params: TrailingParams, highWater: Money): Money {
-  const cap = params.startingBalance.plus(params.stopOffset);
   const trailing = highWater.minus(params.drawdownAllowance);
-  return Money.min(cap, trailing);
+  return params.stopAt === null ? trailing : Money.min(params.stopAt, trailing);
+}
+
+/** True when the threshold has reached a stop it can rise no further past. */
+function isCapped(params: TrailingParams, threshold: Money): boolean {
+  return params.stopAt !== null && threshold.equals(params.stopAt);
 }
 
 export function initialTrailingState(params: TrailingParams): TrailingState {
@@ -56,7 +72,7 @@ export function initialTrailingState(params: TrailingParams): TrailingState {
   return {
     highWater,
     threshold,
-    thresholdIsCapped: threshold.equals(params.startingBalance.plus(params.stopOffset)),
+    thresholdIsCapped: isCapped(params, threshold),
   };
 }
 
@@ -82,7 +98,7 @@ export function applyEquityObservation(
   return {
     highWater,
     threshold,
-    thresholdIsCapped: threshold.equals(params.startingBalance.plus(params.stopOffset)),
+    thresholdIsCapped: isCapped(params, threshold),
   };
 }
 
