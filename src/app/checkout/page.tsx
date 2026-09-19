@@ -4,11 +4,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getCurrentUser } from '@/server/auth/session';
 import { createQuote, requiredDocuments } from '@/server/services/checkout-service';
-import { isPlanKey } from '@/domain/catalog/plans';
+import { getPlan, isPlanKey } from '@/domain/catalog/plans';
 import { isAddOnKey, type AddOnKey } from '@/domain/catalog/addons';
 import { getConfig } from '@/server/config';
 import { DEFAULT_COUPON } from '@/domain/pricing/coupon';
 import { CheckoutForm, type CheckoutDocument } from '@/components/CheckoutForm';
+import { CheckoutSteps } from '@/components/CheckoutSteps';
 import { Callout, SectionHeading } from '@/components/ui';
 import { serialiseMoney } from '@/server/money-mapper';
 
@@ -66,14 +67,21 @@ export default async function CheckoutPage({
     couponApplied ? base : [...base, ['coupon', DEFAULT_COUPON.value.code]],
   );
 
+  const selectedPlan = getPlan(planKey);
+  const planLabel = selectedPlan.label;
+  const planCeiling = selectedPlan.positionCeiling.value;
+
   const blockedInProduction = quote.productionBlockers.length > 0;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-3xl font-bold tracking-tight">Complete your purchase</h1>
-      <p className="mt-2 text-fg-muted">
-        Review the exact terms, sign, then pay. Nothing is charged until you sign.
+      <h1 className="text-3xl">Complete your purchase</h1>
+      <p className="no-caps mt-2 text-fg-muted">
+        Nothing is charged until you sign.
       </p>
+      <div className="mt-5">
+        <CheckoutSteps current={2} />
+      </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-12">
         <div className="lg:col-span-7 space-y-8">
@@ -134,36 +142,54 @@ export default async function CheckoutPage({
 
         <aside className="lg:col-span-5">
           <div className="lg:sticky lg:top-24 space-y-4">
-            <div className="rounded-xl border border-border bg-surface-raised p-5">
-              <h2 className="font-semibold">Order total</h2>
-              <dl className="mt-4 space-y-0 text-sm">
-                <div className="flex justify-between py-2 border-b border-border">
-                  <dt className="text-fg-muted">Subtotal</dt>
+            <div className="rounded-xl border border-border-strong bg-card p-5">
+              <p className="label">Order summary</p>
+              <p className="tnum mt-2 text-lg font-bold">{planLabel}</p>
+              <p className="no-caps text-sm text-fg-subtle">
+                <span className="tnum">{planCeiling.minis}</span> minis or{' '}
+                <span className="tnum">{planCeiling.micros}</span> micros
+              </p>
+
+              <dl className="mt-4 text-sm">
+                <div className="flex justify-between gap-4 border-b border-border py-2.5">
+                  <dt className="no-caps text-fg-muted">Account fee</dt>
                   <dd className="tnum">{serialiseMoney(quote.subtotal).display}</dd>
                 </div>
                 {!quote.discountTotal.isZero() && (
-                  <div className="flex justify-between py-2 border-b border-border text-accent">
-                    <dt>Discount ({Number(quote.couponPercentOff)}%)</dt>
-                    <dd className="tnum">&minus;{serialiseMoney(quote.discountTotal).display}</dd>
+                  <div className="flex justify-between gap-4 border-b border-border py-2.5">
+                    <dt className="no-caps text-fg-muted">Code {DEFAULT_COUPON.value.code}</dt>
+                    <dd className="tnum text-accent">
+                      &minus;{serialiseMoney(quote.discountTotal).display}
+                    </dd>
                   </div>
                 )}
-                <div className="flex justify-between py-2 border-b border-border">
-                  <dt className="text-fg-muted">Tax</dt>
+                {/*
+                  A LINE ITEM, not a marketing claim. "No subscription" in body
+                  copy is something every firm in this category says; a zero on
+                  the invoice is checkable.
+                */}
+                <div className="flex justify-between gap-4 border-b border-border py-2.5">
+                  <dt className="no-caps text-fg-muted">Recurring charges</dt>
+                  <dd className="tnum">$0.00</dd>
+                </div>
+                <div className="flex justify-between gap-4 border-b border-border py-2.5">
+                  <dt className="no-caps text-fg-muted">Tax</dt>
                   <dd className="tnum text-fg-subtle">
                     {quote.taxStatus === 'NOT_CONFIGURED'
                       ? 'Not included'
                       : serialiseMoney(quote.tax).display}
                   </dd>
                 </div>
-                <div className="flex justify-between pt-4 mt-1">
-                  <dt className="font-semibold">Total due today</dt>
-                  <dd className="text-2xl font-bold tnum text-accent">
+                <div className="flex items-baseline justify-between gap-4 pt-4">
+                  <dt className="text-sm">Due today</dt>
+                  <dd className="tnum text-[26px] font-bold text-accent">
                     {serialiseMoney(quote.total).display}
                   </dd>
                 </div>
               </dl>
+
               {quote.taxStatus === 'NOT_CONFIGURED' && (
-                <p className="text-xs text-fg-subtle mt-3">
+                <p className="no-caps text-xs text-fg-fine mt-3">
                   Tax treatment has not been configured, so this total excludes any tax that may
                   apply.
                 </p>

@@ -130,7 +130,29 @@ export function CheckoutForm({
               <p id="agreement-help" className="no-caps text-sm text-fg-muted mt-1">
                 {documents.length} documents in one PDF, each identified by version and hash.
               </p>
-              <div className="flex flex-wrap gap-3 mt-2 text-sm">
+
+              {/* The documents in the bundle, each with its state. One signature
+                  covers all of them, so the state is shared — showing per-document
+                  badges that always move together would imply a choice there is
+                  not one of. */}
+              <ul className="mt-3 space-y-1.5">
+                {documents.map((document) => (
+                  <li key={document.id} className="flex items-center justify-between gap-3">
+                    <span className="no-caps text-sm text-fg-muted">{document.title}</span>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                        agreed
+                          ? 'border-accent text-accent'
+                          : 'border-border-bold text-fg-disabled'
+                      }`}
+                    >
+                      {agreed ? 'Signed' : 'Read & sign'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="flex flex-wrap gap-3 mt-3 text-sm">
                 <a
                   href={pdfHref}
                   target="_blank"
@@ -208,21 +230,51 @@ export function CheckoutForm({
           )}
         </div>
 
+        <div className="rounded-xl border border-border-strong bg-card-danger p-4">
+          <p className="no-caps text-sm leading-relaxed">
+            This is a simulated account. You can breach a limit, lose access and lose this fee. Most
+            participants in programs of this kind do not receive a payout.
+          </p>
+        </div>
+
+        {/* Disabled, never hidden, with the reason written on the button itself.
+            A button that vanishes leaves someone hunting for what they missed. */}
         <button
           type="submit"
           disabled={!canSubmit}
-          className="no-caps w-full rounded-lg bg-accent px-4 py-3.5 font-bold text-bg hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="no-caps w-full rounded-[9px] bg-accent px-4 py-3.5 font-semibold text-black hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-transparent disabled:text-fg-disabled disabled:border disabled:border-border-bold transition-colors"
         >
-          {pending ? 'Processing…' : `Sign and pay ${totalDisplay}`}
+          {pending
+            ? 'Processing…'
+            : !agreed
+              ? 'Agree to the terms to pay'
+              : typedName.trim().length < 2
+                ? 'Sign with your full legal name to pay'
+                : `Sign and pay ${totalDisplay}`}
         </button>
 
-        <p aria-live="polite" className="no-caps text-xs text-fg-subtle text-center">
+        <p aria-live="polite" className="sr-only">
           {!agreed
             ? 'Tick the agreement to continue.'
             : typedName.trim().length < 2
               ? 'Type your full legal name to continue.'
-              : 'One-time charge. Nothing renews automatically.'}
+              : 'Ready to pay.'}
         </p>
+
+        <ul className="space-y-1.5">
+          {[
+            'Account live within minutes of payment',
+            'Nothing renews, and no card is kept on file',
+            'Rules are enforced on our servers, not by manual review',
+          ].map((point) => (
+            <li key={point} className="no-caps flex gap-2 text-xs text-fg-fine">
+              <span aria-hidden="true" className="text-accent">
+                ✓
+              </span>
+              {point}
+            </li>
+          ))}
+        </ul>
       </form>
 
       <p className="no-caps text-xs text-fg-subtle">
