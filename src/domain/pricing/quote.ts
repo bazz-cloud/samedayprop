@@ -16,7 +16,8 @@ import { Money, usd, USD, type Currency } from '../money/money';
 import { allocateProportionally } from '../money/allocate';
 import { getAddOn, isAddOnKey, type AddOnKey } from '../catalog/addons';
 import { getPlan, isPlanKey, planLaunchBlockers, type PlanKey } from '../catalog/plans';
-import { unresolved, type Governed } from '../config/requirement-status';
+import { confirmed, unresolved, type Governed } from '../config/requirement-status';
+import { POLICY_DRAFTS, policiesBlockProductionSale } from '../policy/policies';
 import type { CouponDefinition } from './coupon';
 
 export type QuoteLineKind = 'ACCOUNT_PLAN' | 'ADDON';
@@ -56,6 +57,39 @@ export interface TaxPolicy {
   /** Returns the tax due on the post-discount total. */
   computeTax(taxableTotal: Money): Money;
 }
+
+/**
+ * Michigan sales tax, 6%, exclusive.
+ *
+ * OWNER DECISION, 2026-09-19. Applied to the post-discount total, so a coupon
+ * reduces the tax with the price, and rounded half-up to the cent on the whole
+ * order rather than per line — one taxable amount, one rounding.
+ *
+ * TWO THINGS THE OWNER'S ACCOUNTANT HAS TO CONFIRM, recorded here because the
+ * code cannot settle either one:
+ *
+ *  1. WHETHER THIS FEE IS TAXABLE AT ALL. Michigan taxes tangible personal
+ *     property and prewritten computer software delivered electronically; it
+ *     does not tax most services. Access to a simulated trading account is not
+ *     obviously any of those.
+ *  2. WHOSE RATE APPLIES. Sales tax is normally destination-based: a Michigan
+ *     seller does not usually charge Michigan tax to a buyer in another state,
+ *     and may owe that state's tax instead once nexus thresholds are crossed.
+ *     This policy charges 6% on every order regardless of where the buyer is,
+ *     which is what was asked for. Switching to destination-based means reading
+ *     the buyer's region at checkout, which the profile already stores.
+ *
+ * Neither caveat blocks the sale; both are in docs/OPEN_ITEMS.md.
+ */
+export const MICHIGAN_SALES_TAX: Governed<TaxPolicy> = confirmed(
+  {
+    kind: 'CONFIGURED',
+    description: 'Michigan sales tax of 6% is added to the discounted total.',
+    computeTax: (taxableTotal: Money) => taxableTotal.mulRatio(6n, 100n, 'half-up'),
+  },
+  'Michigan sales tax, 6%, added on top of the discounted total.',
+  'Owner decision 2026-09-19',
+);
 
 export const TAX_NOT_CONFIGURED: Governed<TaxPolicy> = unresolved(
   {
@@ -105,7 +139,7 @@ export interface Quote {
 
 export function buildQuote(input: QuoteInput): Quote {
   const currency = input.currency ?? USD;
-  const taxPolicyGoverned = input.taxPolicy ?? TAX_NOT_CONFIGURED;
+  const taxPolicyGoverned = input.taxPolicy ?? MICHIGAN_SALES_TAX;
   const taxPolicy = taxPolicyGoverned.value;
 
   if (!isPlanKey(input.selection.planKey)) {
@@ -193,6 +227,21 @@ export function buildQuote(input: QuoteInput): Quote {
 
   // ---- production gating --------------------------------------------------
   const productionBlockers: QuoteBlocker[] = [];
+
+  // The ten trading and account policies gate a production sale just as the
+  // risk numbers do. They were NOT wired in before, which only became visible
+  // once tax and the trailing policy were approved and every other blocker
+  // cleared — at which point a quote would have reported itself sellable while
+  // the policies governing conduct, refunds and closure were still drafts.
+  if (policiesBlockProductionSale()) {
+    const pending = POLICY_DRAFTS.filter((policy) => policy.status !== 'CONFIRMED');
+    productionBlockers.push({
+      code: 'POLICIES_UNAPPROVED',
+      detail:
+        `${pending.length} trading and account ${pending.length === 1 ? 'policy is' : 'policies are'} ` +
+        `still awaiting approval: ${pending.map((policy) => policy.value.title).join(', ')}.`,
+    });
+  }
 
   for (const blocker of planLaunchBlockers(plan)) {
     productionBlockers.push({

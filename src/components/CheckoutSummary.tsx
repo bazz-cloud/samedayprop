@@ -43,6 +43,7 @@ export function CheckoutSummary({
   subtotal,
   discount,
   taxDisplay,
+  taxLabel = 'Tax',
   taxNotConfigured,
   total,
 }: {
@@ -51,6 +52,8 @@ export function CheckoutSummary({
   subtotal: string;
   discount: string | null;
   taxDisplay: string;
+  /** e.g. "Michigan sales tax (6%)". Falls back to "Tax". */
+  taxLabel?: string;
   taxNotConfigured: boolean;
   total: string;
 }) {
@@ -151,7 +154,7 @@ export function CheckoutSummary({
           checkable.
         */}
         <Line label="Recurring charges" value="$0.00" />
-        <Line label="Tax" value={taxDisplay} muted />
+        <Line label={taxLabel} value={taxDisplay} muted />
       </dl>
 
       <div className="border-t border-border-strong bg-surface px-5 py-4">

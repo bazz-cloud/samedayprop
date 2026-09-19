@@ -446,7 +446,9 @@ export function AccountConfigurator({
                     )}
 
                     <div className="flex items-baseline justify-between gap-3 py-2 text-sm">
-                      <dt className="text-fg-muted">Tax</dt>
+                      <dt className="text-fg-muted">
+                        {preview.taxStatus === 'NOT_CONFIGURED' ? 'Tax' : 'Michigan sales tax (6%)'}
+                      </dt>
                       <dd className="tnum text-fg-subtle">
                         {preview.taxStatus === 'NOT_CONFIGURED' ? 'Not included' : preview.tax.display}
                       </dd>

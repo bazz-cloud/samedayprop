@@ -3,7 +3,7 @@ import { Money, usd } from '@/domain/money/money';
 import { allocateByWeight, allocateProportionally } from '@/domain/money/allocate';
 import { MINIMUM_GROSS_WITHDRAWAL, PLANS, couponPrice, getPlan } from '@/domain/catalog/plans';
 import { getPlanViews } from '@/server/views/catalog-view';
-import { buildQuote, canonicaliseQuote } from '@/domain/pricing/quote';
+import { buildQuote, canonicaliseQuote, TAX_NOT_CONFIGURED } from '@/domain/pricing/quote';
 import { DEFAULT_COUPON, normaliseCouponCode, validateCoupon } from '@/domain/pricing/coupon';
 import {
   lifetimeCapAmountMinor,
@@ -65,15 +65,15 @@ describe('all six 25% coupon prices match the confirmed table exactly', () => {
     expect(couponPrice(plan.listPrice.value, 25n).toDecimalString()).toBe(discounted);
   });
 
-  it('derives the same discounted price through the quote engine', () => {
+  it('derives the same discounted price through the quote engine, before tax', () => {
     for (const plan of PLANS) {
       const quote = buildQuote({
         selection: { planKey: plan.key, addOnKeys: [], couponCode: coupon.code },
         coupon,
       });
-      expect(quote.total.toDecimalString()).toBe(
-        expected[plan.key]![1],
-      );
+      // taxableTotal, not total: Michigan sales tax is added on top, so the
+      // advertised price is the pre-tax figure.
+      expect(quote.taxableTotal.toDecimalString()).toBe(expected[plan.key]![1]);
     }
   });
 });
@@ -91,8 +91,9 @@ describe('quote composition', () => {
     expect(quote.subtotal.toDecimalString()).toBe('696.00');
     expect(quote.discountTotal.toDecimalString()).toBe('174.00');
     expect(quote.taxableTotal.toDecimalString()).toBe('522.00');
-    expect(quote.tax.isZero()).toBe(true);
-    expect(quote.total.toDecimalString()).toBe('522.00');
+    // 6% of 522.00 is exactly 31.32, so this case needs no rounding rule.
+    expect(quote.tax.toDecimalString()).toBe('31.32');
+    expect(quote.total.toDecimalString()).toBe('553.32');
   });
 
   it('allocates the discount across lines so the parts sum to the whole', () => {
@@ -127,7 +128,8 @@ describe('quote composition', () => {
 
   it('charges list price when no coupon is applied', () => {
     const quote = buildQuote({ selection: { planKey: 'SIM_100K', addOnKeys: [], couponCode: null }, coupon: null });
-    expect(quote.total.toDecimalString()).toBe('999.00');
+    expect(quote.taxableTotal.toDecimalString()).toBe('999.00');
+    expect(quote.total.toDecimalString()).toBe('1058.94');
     expect(quote.discountTotal.isZero()).toBe(true);
   });
 
@@ -232,10 +234,14 @@ describe('coupon validation', () => {
 });
 
 describe('production gating', () => {
-  it('blocks every plan from production sale while risk terms are unapproved', () => {
+  it('blocks every plan from production sale while the policies are drafts', () => {
+    // The risk numbers, the lifetime cap, the trailing policy and tax are all
+    // approved now. The ten policy drafts are what still holds the gate, and
+    // this is the test that says so — without it, approving the last number
+    // would have opened production sale silently.
     for (const plan of PLANS) {
       const quote = buildQuote({ selection: { planKey: plan.key, addOnKeys: [], couponCode: null }, coupon: null });
-      expect(quote.productionBlockers.length).toBeGreaterThan(0);
+      expect(quote.productionBlockers.map((b) => b.code)).toContain('POLICIES_UNAPPROVED');
     }
   });
 
@@ -258,9 +264,33 @@ describe('production gating', () => {
     expect(() => lifetimeCapAmountMinor(undecided)).toThrow(/UNRESOLVED/);
   });
 
-  it('blocks on unconfigured tax rather than assuming zero tax is correct', () => {
+  it('no longer blocks on tax, now that Michigan 6% is approved', () => {
     const quote = buildQuote({ selection: { planKey: 'SIM_50K', addOnKeys: [], couponCode: null }, coupon: null });
+    expect(quote.productionBlockers.map((b) => b.code)).not.toContain('TAX_UNRESOLVED');
+    expect(quote.taxStatus).toBe('CONFIGURED');
+  });
+
+  it('still blocks if a quote is ever built with no tax treatment', () => {
+    // The unresolved policy is retained and still gates, so removing the
+    // Michigan decision would stop sales rather than silently charge zero tax.
+    const quote = buildQuote({
+      selection: { planKey: 'SIM_50K', addOnKeys: [], couponCode: null },
+      coupon: null,
+      taxPolicy: TAX_NOT_CONFIGURED,
+    });
     expect(quote.productionBlockers.map((b) => b.code)).toContain('TAX_UNRESOLVED');
+    expect(quote.tax.isZero()).toBe(true);
+  });
+
+  it('applies 6% to the DISCOUNTED total, so a coupon reduces the tax with the price', () => {
+    const quote = buildQuote({
+      selection: { planKey: 'SIM_50K', addOnKeys: [], couponCode: coupon.code },
+      coupon,
+    });
+    expect(quote.taxableTotal.toDecimalString()).toBe('449.25');
+    // 6% of 449.25 is 26.955, which rounds half-up to the cent.
+    expect(quote.tax.toDecimalString()).toBe('26.96');
+    expect(quote.total.toDecimalString()).toBe('476.21');
   });
 });
 

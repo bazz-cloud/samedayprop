@@ -67,7 +67,9 @@ export function PlanCards({ plans }: { plans: readonly PlanView[] }) {
                   {plan.listPrice.display}
                 </span>
               </div>
-              <p className="no-caps mt-1 text-xs text-fg-fine">One payment. Nothing renews.</p>
+              <p className="no-caps mt-1 text-xs text-fg-fine">
+                One payment. Nothing renews. Plus 6% MI sales tax.
+              </p>
 
               <hr className="my-5 border-border" />
 

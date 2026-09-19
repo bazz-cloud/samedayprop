@@ -147,6 +147,11 @@ const REQUIRED: readonly { page: string; label: string; text: string }[] = [
     label: 'tax is not configured',
     text: 'Tax treatment has not been configured, so this total excludes any tax that may apply.',
   },
+  {
+    page: 'src/components/SiteFooter.tsx',
+    label: 'advertised prices exclude sales tax',
+    text: 'Michigan sales tax of 6% is added to the discounted total at checkout',
+  },
 ];
 
 describe('disclosures survive compression', () => {

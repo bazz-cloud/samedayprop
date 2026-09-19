@@ -90,6 +90,11 @@ export function SiteFooter({ company }: { company: CompanyPlaceholders }) {
               or ends access. Most participants in programs of this kind do not receive a payout.
             </p>
             <p>
+              <strong className="text-fg-muted">Prices exclude sales tax.</strong> Michigan sales
+              tax of 6% is added to the discounted total at checkout and is shown as its own line
+              before you pay.
+            </p>
+            <p>
               No profit, reward or payout is guaranteed. Payout eligibility is determined by the
               published rules; the timing of any payment depends on payment rails, identity
               verification status and banking cut-off times. We do not guarantee same-day receipt

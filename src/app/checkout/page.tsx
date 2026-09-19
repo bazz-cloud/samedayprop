@@ -209,6 +209,9 @@ export default async function CheckoutPage({
                   ? 'Not included'
                   : serialiseMoney(quote.tax).display
               }
+              taxLabel={
+                quote.taxStatus === 'NOT_CONFIGURED' ? 'Tax' : 'Michigan sales tax (6%)'
+              }
               taxNotConfigured={quote.taxStatus === 'NOT_CONFIGURED'}
               total={serialiseMoney(quote.total).display}
               promo={{

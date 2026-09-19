@@ -253,8 +253,10 @@ describe('purchase to provisioning', () => {
       include: { items: true },
     });
 
-    expect(Money.fromMinor(order.totalMinor).toDecimalString()).toBe('449.25');
+    // $449.25 of price plus $26.96 of Michigan sales tax.
     expect(Money.fromMinor(order.discountMinor).toDecimalString()).toBe('149.75');
+    expect(Money.fromMinor(order.taxMinor).toDecimalString()).toBe('26.96');
+    expect(Money.fromMinor(order.totalMinor).toDecimalString()).toBe('476.21');
 
     const snapshot = JSON.parse(order.termsSnapshot) as {
       rules: Record<string, string>;
@@ -1095,7 +1097,7 @@ describe('coupon usage under concurrency', () => {
     });
     expect(later.couponRejection).toMatch(/already used/);
     // And the quote is priced at full list, not silently discounted anyway.
-    expect(later.quote.total.toDecimalString()).toBe('349.00');
+    expect(later.quote.taxableTotal.toDecimalString()).toBe('349.00');
   });
 });
 
