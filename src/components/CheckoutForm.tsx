@@ -3,24 +3,26 @@
 /**
  * Checkout signature and payment form.
  *
- * Two boxes, both unchecked by default — pre-ticking a consent box would make
- * the signature evidence worthless:
- *
- *   1. Agreement. One tick covers every required document, because they are
- *      served as one PDF with one signature block. The per-document evidence is
- *      unaffected: the PDF's first page lists each title, version and body hash,
- *      and the server still writes one acceptance row per document.
- *   2. Coupon. Applying or removing it re-quotes on the server, so the price is
- *      never computed in the browser.
+ * The agreement box is unchecked by default — pre-ticking a consent box would
+ * make the signature evidence worthless. One tick covers every required
+ * document, because they are served as one PDF with one signature block. The
+ * per-document evidence is unaffected: the PDF's first page lists each title,
+ * version and body hash, and the server still writes one acceptance row per
+ * document.
  *
  * The signature is an affirmative action: the customer types their full legal
  * name, and submit stays disabled until the agreement is ticked and a name is
  * entered.
+ *
+ * The promo field lives in the order summary beside the total it changes, not
+ * in here. It re-quotes on the server either way, so the price is never
+ * computed in the browser.
  */
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { completeCheckout, CONSENT_WORDING, type CheckoutActionState } from '@/app/checkout/actions';
+import { completeCheckout, type CheckoutActionState } from '@/app/checkout/actions';
+import { CONSENT_WORDING } from '@/app/checkout/consent';
 import { Callout } from './ui';
 
 export interface CheckoutDocument {
@@ -39,7 +41,6 @@ export function CheckoutForm({
   suggestedName,
   totalDisplay,
   isDemo,
-  coupon,
 }: {
   quoteId: string;
   idempotencyKey: string;
@@ -47,15 +48,6 @@ export function CheckoutForm({
   suggestedName: string;
   totalDisplay: string;
   isDemo: boolean;
-  coupon: {
-    code: string;
-    percentOff: number;
-    applied: boolean;
-    /** Where to go to toggle it. The server re-quotes from this URL. */
-    toggleHref: string;
-    savingDisplay: string | null;
-    rejection: string | null;
-  };
 }) {
   const [state, formAction, pending] = useActionState(completeCheckout, INITIAL);
   const [agreed, setAgreed] = useState(false);
@@ -67,39 +59,6 @@ export function CheckoutForm({
 
   return (
     <div className="space-y-4">
-      {/* ---- box 2: the coupon ------------------------------------------- */}
-      {/* Its own form: toggling re-quotes on the server via a GET, so the
-          discount can never be decided in the browser. */}
-      <form method="get" action="/checkout" className="rounded-xl border border-border bg-surface p-4">
-        <ToggleFields href={coupon.toggleHref} />
-        <div className="flex items-start gap-3">
-          <input
-            id="applyCoupon"
-            type="checkbox"
-            checked={coupon.applied}
-            onChange={(event) => event.currentTarget.form?.requestSubmit()}
-            className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
-          />
-          <div className="min-w-0 flex-1">
-            <label htmlFor="applyCoupon" className="no-caps font-bold cursor-pointer">
-              Apply discount code{' '}
-              <span className={coupon.applied ? 'coupon-chip is-on' : 'coupon-chip'}>
-                {coupon.code}
-              </span>
-            </label>
-            <p className="no-caps text-sm text-fg-muted mt-1">
-              {coupon.applied && coupon.savingDisplay
-                ? `${coupon.percentOff}% off — you save ${coupon.savingDisplay}.`
-                : `${coupon.percentOff}% off your account and every eligible extra.`}
-            </p>
-            {coupon.rejection && (
-              <p className="no-caps text-sm text-fg mt-1">{coupon.rejection}</p>
-            )}
-          </div>
-        </div>
-      </form>
-
-      {/* ---- box 1: the agreement ---------------------------------------- */}
       <form action={formAction} className="space-y-5">
         <input type="hidden" name="quoteId" value={quoteId} />
         <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
@@ -214,20 +173,35 @@ export function CheckoutForm({
           yet been decided, and on a legal review that has not yet happened.
         </Callout>
 
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <h3 className="text-sm">Payment</h3>
-          {isDemo ? (
-            <p className="no-caps text-sm text-fg mt-2 leading-relaxed">
-              Demonstration mode. No payment provider is connected, no card details are collected and
-              no money will move. Submitting records a simulated payment so the rest of the flow can
-              be tested.
-            </p>
-          ) : (
-            <p className="no-caps text-sm text-fg-muted mt-2 leading-relaxed">
-              You will be taken to our payment provider&apos;s hosted page to enter your card
-              details. Card details are never entered on or stored by this site.
-            </p>
-          )}
+        {/* Styled as a payment-method block because that is what it is, but with
+            no card-brand marks: no payment provider is connected, and a row of
+            network logos would be the one piece of theatre on this page. */}
+        <div className="rounded-xl border border-border bg-surface overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <h3 className="label">Payment method</h3>
+            <span
+              className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                isDemo ? 'border-border-bold text-fg-subtle' : 'border-accent text-accent'
+              }`}
+            >
+              {isDemo ? 'Demonstration' : 'Hosted page'}
+            </span>
+          </div>
+          <div className="flex items-start gap-3 p-4">
+            <LockIcon />
+            {isDemo ? (
+              <p className="no-caps text-sm text-fg leading-relaxed">
+                Demonstration mode. No payment provider is connected, no card details are collected and
+                no money will move. Submitting records a simulated payment so the rest of the flow can
+                be tested.
+              </p>
+            ) : (
+              <p className="no-caps text-sm text-fg-muted leading-relaxed">
+                You will be taken to our payment provider&apos;s hosted page to enter your card
+                details. Card details are never entered on or stored by this site.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="rounded-xl border border-border-strong bg-card-danger p-4">
@@ -242,7 +216,7 @@ export function CheckoutForm({
         <button
           type="submit"
           disabled={!canSubmit}
-          className="no-caps w-full rounded-[9px] bg-accent px-4 py-3.5 font-semibold text-black hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-transparent disabled:text-fg-disabled disabled:border disabled:border-border-bold transition-colors"
+          className="no-caps w-full rounded-[9px] bg-accent px-4 py-3.5 text-base font-bold text-black hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-transparent disabled:text-fg-subtle disabled:border disabled:border-dashed disabled:border-border-bold transition-colors"
         >
           {pending
             ? 'Processing…'
@@ -261,14 +235,17 @@ export function CheckoutForm({
               : 'Ready to pay.'}
         </p>
 
-        <ul className="space-y-1.5">
+        <ul className="grid gap-2 sm:grid-cols-3">
           {[
             'Account live within minutes of payment',
             'Nothing renews, and no card is kept on file',
             'Rules are enforced on our servers, not by manual review',
           ].map((point) => (
-            <li key={point} className="no-caps flex gap-2 text-xs text-fg-fine">
-              <span aria-hidden="true" className="text-accent">
+            <li
+              key={point}
+              className="no-caps flex gap-2 rounded-lg border border-border bg-surface px-3 py-2.5 text-xs text-fg-muted leading-relaxed"
+            >
+              <span aria-hidden="true" className="text-accent shrink-0">
                 ✓
               </span>
               {point}
@@ -288,19 +265,21 @@ export function CheckoutForm({
   );
 }
 
-/**
- * The coupon toggle target, expressed as hidden fields.
- *
- * A GET form serialises its own fields rather than keeping the action's query
- * string, so the destination has to be rebuilt here.
- */
-function ToggleFields({ href }: { href: string }) {
-  const params = new URLSearchParams(href.split('?')[1] ?? '');
+/** A padlock, inline. No icon package, no remote asset. */
+function LockIcon() {
   return (
-    <>
-      {[...params.entries()].map(([key, value], index) => (
-        <input key={`${key}-${index}`} type="hidden" name={key} value={value} />
-      ))}
-    </>
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="mt-0.5 h-4 w-4 shrink-0 text-accent"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="4" y="10" width="16" height="10" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
   );
 }

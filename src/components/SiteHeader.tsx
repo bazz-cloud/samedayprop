@@ -81,7 +81,7 @@ export function SiteHeader({ user }: { user: AuthenticatedUser | null }) {
                 href="/accounts"
                 className="px-3 py-2 rounded-md bg-accent text-bg font-semibold hover:bg-accent-strong transition-colors"
               >
-                Get paid
+                Get funded
               </Link>
             </>
           )}

@@ -123,7 +123,7 @@ export function WithdrawalCalculator({
           href={`/checkout?plan=${plan.key}`}
           className="no-caps mt-5 inline-block rounded-[9px] bg-accent px-6 py-3.5 font-semibold text-black hover:bg-accent-strong transition-colors"
         >
-          Get paid
+          Get funded
         </Link>
       </div>
 

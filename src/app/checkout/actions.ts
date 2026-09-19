@@ -25,11 +25,7 @@ import {
 import { getPaymentProvider } from '@/server/providers/registry';
 import { Money } from '@/domain/money/money';
 import { getConfig } from '@/server/config';
-
-export const CONSENT_WORDING =
-  'I have read this document, I agree to it, and I intend my typed legal name below to be my ' +
-  'signature. I understand trading in this program is simulated and that my simulated account ' +
-  'balance is not cash held for me.';
+import { CONSENT_WORDING } from './consent';
 
 export interface CheckoutActionState {
   readonly error: string | null;

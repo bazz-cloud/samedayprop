@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 /**
  * Site-wide claim bar.
@@ -8,8 +11,15 @@ import Link from 'next/link';
  * system actually enforces: there is no consistency term anywhere in payout
  * eligibility, no evaluation state in the account lifecycle, and no minimum
  * trading day requirement.
+ *
+ * Except in checkout. Once someone is on the payment screen the job is to let
+ * them finish, and a green button pointing back at the catalogue is a way out
+ * of the page they were trying to complete.
  */
 export function ValueBar() {
+  const pathname = usePathname();
+  if (pathname?.startsWith('/checkout')) return null;
+
   return (
     <div className="border-b border-border bg-surface">
       <div className="mx-auto max-w-7xl px-4 py-2.5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 sm:justify-between">
@@ -22,7 +32,7 @@ export function ValueBar() {
           href="/accounts"
           className="display shrink-0 rounded-md bg-accent px-4 py-1.5 text-[13px] uppercase tracking-wide text-bg hover:bg-accent-strong transition-colors"
         >
-          Get paid
+          Get funded
         </Link>
       </div>
     </div>

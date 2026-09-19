@@ -114,6 +114,39 @@ const REQUIRED: readonly { page: string; label: string; text: string }[] = [
     label: 'balance is a nominal figure',
     text: 'the balance is a nominal figure, not cash held for you.',
   },
+  // Checkout. This page was rebuilt to look like a checkout, and the failure
+  // mode of that work is a warning losing its box in the rearrangement. These
+  // are the four sentences that have to survive any layout of it.
+  {
+    page: 'src/components/CheckoutForm.tsx',
+    label: 'you can lose the fee you paid',
+    text: 'This is a simulated account. You can breach a limit, lose access and lose this fee. Most participants in programs of this kind do not receive a payout.',
+  },
+  {
+    page: 'src/components/CheckoutForm.tsx',
+    label: 'signing is not a guarantee of enforceability',
+    text: 'It does not by itself guarantee that every term is enforceable',
+  },
+  {
+    page: 'src/components/CheckoutForm.tsx',
+    label: 'card details never touch this site',
+    text: 'Card details are never entered on or stored by this site.',
+  },
+  {
+    page: 'src/app/checkout/page.tsx',
+    label: 'the signature is bound to this price and rule set',
+    text: 'Your signature is bound to this exact price and rule set.',
+  },
+  {
+    page: 'src/app/checkout/page.tsx',
+    label: 'production blockers are shown, not hidden',
+    text: 'This purchase cannot be made with real money yet, for these reasons:',
+  },
+  {
+    page: 'src/components/CheckoutSummary.tsx',
+    label: 'tax is not configured',
+    text: 'Tax treatment has not been configured, so this total excludes any tax that may apply.',
+  },
 ];
 
 describe('disclosures survive compression', () => {

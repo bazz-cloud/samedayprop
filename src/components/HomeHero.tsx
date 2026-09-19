@@ -107,7 +107,7 @@ export function HomeHero() {
                 href="/accounts"
                 className="display rounded-lg bg-accent px-8 py-4 text-lg uppercase tracking-wide text-bg hover:bg-accent-strong transition-colors"
               >
-                Get paid
+                Get funded
               </Link>
               <Link
                 href="/rules"
