@@ -100,18 +100,13 @@ export function HomeHero() {
               </span>
             </div>
 
-            <p
-              className="anim-rise mt-6 max-w-xl text-fg-muted leading-relaxed"
-              style={{ animationDelay: '1.7s' }}
-            >
-              Buy a simulated futures account and trade it the same day. No challenge to pass, no
-              best-day test deciding how much of your profit counts, and no minimum number of
-              trading days before your first payout.
-            </p>
-
+            {/* No marketing paragraph above the fold. What this paragraph used to
+                say is now the stat pairs directly below the hero, where it reads
+                in one pass instead of three lines. The disclosure under the
+                buttons stays: it is a disclosure, not a pitch. */}
             <div
               className="anim-rise mt-8 flex flex-wrap items-center gap-3"
-              style={{ animationDelay: '1.9s' }}
+              style={{ animationDelay: '1.7s' }}
             >
               <Link
                 href="/accounts"
@@ -129,7 +124,7 @@ export function HomeHero() {
 
             <p
               className="anim-rise mt-5 text-xs text-fg-subtle max-w-xl leading-relaxed"
-              style={{ animationDelay: '2.1s' }}
+              style={{ animationDelay: '1.9s' }}
             >
               Trading is simulated and the account size is a nominal figure, not cash held for you.
               A $500 gross withdrawal reduces the simulated account by $500 and pays you $250 in
