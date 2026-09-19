@@ -93,7 +93,8 @@ export function Accordion({
   children,
 }: {
   title: string;
-  rule: string;
+  /** Omitted where the title is the whole question, as on the FAQ. */
+  rule?: string;
   status?: Status;
   children: ReactNode;
 }) {
@@ -107,7 +108,7 @@ export function Accordion({
           <h3 className="text-sm font-bold">{title}</h3>
           {status && <Chip status={status} />}
         </div>
-        <p className="no-caps mt-1.5 pl-5 text-sm text-fg-muted">{rule}</p>
+        {rule && <p className="no-caps mt-1.5 pl-5 text-sm text-fg-muted">{rule}</p>}
       </summary>
       <div className="px-4 pb-4 pl-9 text-sm text-fg-muted leading-relaxed">{children}</div>
     </details>
