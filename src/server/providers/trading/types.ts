@@ -21,6 +21,17 @@ import type { Money } from '@/domain/money/money';
 export type CapabilitySupport =
   /** Confirmed against current official documentation AND a working call. */
   | 'VERIFIED'
+  /**
+   * Implemented against the provider's official API specification, but never
+   * exercised against real credentials.
+   *
+   * A distinct level because "we read the spec" and "we called it and it
+   * worked" are genuinely different states, and collapsing them is how an
+   * integration gets declared finished a week before it is. A DOCUMENTED
+   * capability runs OUTSIDE production — which is the only way it can ever be
+   * exercised and promoted — and refuses inside it.
+   */
+  | 'DOCUMENTED'
   /** Plausibly available but not yet confirmed against docs or credentials. */
   | 'UNVERIFIED'
   /** Confirmed NOT available under the current agreement or API tier. */
@@ -163,6 +174,11 @@ export function requireCapability(
   const support = provider.capabilities[capability];
   if (support === 'VERIFIED') return;
   if (support === 'MOCK_ONLY' && provider.mode === 'MOCK') return;
+  // DOCUMENTED is the only level that behaves differently by environment: it is
+  // code written from the spec and never run, so it is allowed to run in
+  // staging precisely so somebody can find out whether it works, and refused in
+  // production because nobody has yet.
+  if (support === 'DOCUMENTED' && provider.mode !== 'PRODUCTION') return;
   throw new CapabilityNotAvailableError(capability, support, guidance);
 }
 

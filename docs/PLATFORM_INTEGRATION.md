@@ -88,9 +88,51 @@ responses JSON. Privileged creation and update commands are the part of Trader
 that is *not* exposed to ordinary API users, which is precisely what partner
 access unlocks.
 
-**Nothing above is VERIFIED in this codebase**, and that is not pedantry.
-VERIFIED here means documentation *and* a successful call. We have the first
-and none of the second, so every capability still throws.
+### The adapter is written, from the specification
+
+The official OpenAPI spec is checked in at `docs/vendor/tradovate-openapi.json`
+(341 paths, server `https://demo.tradovateapi.com/v1`). The adapter in
+`src/server/providers/trading/tradovate.ts` is written against it — every path,
+field and enum value comes from that file, none is guessed.
+
+Those capabilities are marked **DOCUMENTED**, a level that sits between
+UNVERIFIED and VERIFIED and means: written from the spec, never run against a
+key. It behaves differently by environment on purpose — **it runs outside
+production, and refuses inside it.** That is the only way code like this can
+ever be exercised and promoted; a capability that refuses everywhere never gets
+tested, and one that runs everywhere gets tested on a customer.
+
+| Operation | Endpoint |
+|---|---|
+| Authenticate | `POST /auth/accesstokenrequest`, token cached and renewed before 90 minutes |
+| Create the trader | `POST /user/createevaluationusers` |
+| Create the account | `POST /user/createevaluationaccounts` |
+| Apply risk | `POST /userAccountAutoLiq/update`, `POST /userAccountPositionLimit/create` |
+| Read risk back | `GET /userAccountAutoLiq/item` |
+| Snapshot | `POST /cashBalance/getcashbalancesnapshot`, `GET /position/list` |
+| Stop trading | `POST /userAccountAutoLiq/update` with `doNotUnlock` |
+| Flatten | `POST /order/liquidatepositions` |
+
+**The risk model maps exactly.** `dailyLossAutoLiq` is our daily loss limit,
+`trailingMaxDrawdown` our drawdown allowance, and `trailingMaxDrawdownMode`
+takes `EOD` or `RealTime`.
+
+**We send `RealTime`.** Our published rule is a threshold that follows equity
+intraday including unrealized gains. `EOD` measures only at the close: a
+materially looser product that several competitors sell, and sending it would
+mean the site says one thing while the platform enforces another. A test fails
+if `EOD` ever appears.
+
+`trailingMaxDrawdownLimit` is where the threshold stops rising. We do not send
+one, because the owner's rule is that it never stops.
+
+**Two things are deliberately still refused.** `adjustSimBalance` — deducting a
+paid reward from the simulated balance — is the one operation where a silent
+failure means real cash left the business and the simulated profit was never
+taken back, and no endpoint in the spec is unambiguously that. And no password
+is ever sent on user creation, though the spec allows one: this system does not
+hold reusable platform credentials, and inventing one would put it in our
+memory, our logs and our error reports.
 
 ## Tradovate — the practical path
 

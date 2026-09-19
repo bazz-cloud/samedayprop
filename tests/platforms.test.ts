@@ -79,10 +79,69 @@ describe('Tradovate configuration', () => {
 describe('neither adapter pretends', () => {
   const account = 'acct-1';
 
-  it('Tradovate refuses every capability while nothing is verified', async () => {
+  it('refuses everything in PRODUCTION until a real call has been seen to work', async () => {
+    // DOCUMENTED means written from the spec and never run. Production is the
+    // one place that distinction has to bite.
+    const provider = new TradovateProvider(
+      'PRODUCTION',
+      'https://demo.tradovateapi.com/v1',
+      'key',
+      'secret',
+      'cid',
+    );
+    await expect(
+      provider.fetchAccountSnapshot('1'),
+    ).rejects.toThrow(/DOCUMENTED/);
+  });
+
+  it('never sends EOD as the drawdown mode', () => {
+    // Our published rule is an intraday threshold that follows unrealized
+    // gains. Tradovate calls that RealTime. EOD measures only at the close and
+    // is a materially looser product — sending it would mean the site says one
+    // thing and the platform enforces another.
+    const source = readFileSync(
+      join(__dirname, '..', 'src/server/providers/trading/tradovate.ts'),
+      'utf8',
+    );
+    expect(source).toContain("'RealTime'");
+    expect(source).not.toMatch(/trailingMaxDrawdownMode:\s*'EOD'/);
+  });
+
+  it('never asks Tradovate to hold a password for the trader', () => {
+    // The spec allows a password on user creation. Using it would put a
+    // reusable platform credential in our memory, our logs and our error
+    // reports.
+    const source = readFileSync(
+      join(__dirname, '..', 'src/server/providers/trading/tradovate.ts'),
+      'utf8',
+    );
+    // The REQUEST BODY, not the prose around it — the comment above the call
+    // explains why no password is sent, and matching on that would make this
+    // test pass on the explanation rather than the code.
+    const body = source.slice(source.indexOf('users: ['), source.indexOf('const userResult'));
+    expect(body).not.toMatch(/password/);
+  });
+
+  it('still refuses to deduct a simulated balance, which is the dangerous one', async () => {
     const provider = new TradovateProvider(
       'SANDBOX',
-      'https://demo-api.staging.ninjatrader.dev',
+      'https://demo-api.staging.ninjatrader.dev/v1',
+      'key',
+      'secret',
+      'cid',
+    );
+    await expect(
+      provider.adjustSimBalance('1', usd('500.00'), 'payout', 'k'),
+    ).rejects.toThrow(/UNVERIFIED/);
+  });
+
+  it('runs outside production so the integration can actually be exercised', async () => {
+    // In SANDBOX the capability gate lets it through, so the failure comes
+    // from the network rather than from the gate. That is the point: this code
+    // is meant to be run against staging and promoted.
+    const provider = new TradovateProvider(
+      'SANDBOX',
+      'https://demo-api.staging.ninjatrader.dev/v1',
       'key',
       'secret',
       'cid',
@@ -97,8 +156,8 @@ describe('neither adapter pretends', () => {
         startingBalance: usd('50000.00'),
         idempotencyKey: 'k',
       }),
-    ).rejects.toThrow(/UNVERIFIED/);
-  });
+    ).rejects.toThrow(/(fetch|network|ENOTFOUND|EAI_AGAIN|failed|authentication)/i);
+  }, 20000);
 
   it('Rithmic refuses account creation as UNSUPPORTED, not merely unverified', async () => {
     // The distinction matters: Rithmic does not open accounts at all, a broker
