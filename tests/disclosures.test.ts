@@ -161,6 +161,19 @@ const REQUIRED: readonly { page: string; label: string; text: string }[] = [
     text: 'Nothing sold here changes your trailing drawdown, your payout split, your daily cash cap or your lifetime cap, and nothing here is required to get paid.',
   },
   {
+    // The upsell sits on the payment screen, which is where an omission is
+    // worth the most money. Both limitation lines have to survive any redesign
+    // of the rows, at the size of the pitch.
+    page: 'src/domain/catalog/addons.ts',
+    label: 'the daily-loss upgrade states what it costs you',
+    text: 'A larger daily allowance means a larger single-day loss is possible, so it can reach the drawdown threshold sooner rather than later.',
+  },
+  {
+    page: 'src/domain/catalog/addons.ts',
+    label: 'the extra-contracts upgrade states what it costs you',
+    text: 'The same move in bigger size reaches your threshold in fewer ticks.',
+  },
+  {
     // The ticker advertises the terms it is offering. If the coupon ever gains
     // an expiry or a usage limit, this line becomes false and has to move with
     // it — the test is here so it cannot be forgotten.

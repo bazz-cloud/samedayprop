@@ -304,43 +304,44 @@ export function AccountConfigurator({
                 return (
                   <label
                     key={addon.key}
-                    className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-colors ${
+                    className={`block rounded-xl border p-4 cursor-pointer transition-colors ${
                       selected
-                        ? 'border-accent bg-accent-dim/30'
-                        : 'border-border bg-surface hover:border-border-strong'
+                        ? 'border-accent bg-card-accent'
+                        : 'border-border bg-surface hover:border-border-bold'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => toggleAddOn(addon.key)}
-                      className="mt-1 h-4 w-4 accent-[var(--color-accent)]"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                        <span className="font-medium">{addon.name}</span>
-                        {price && (
-                          <span className="tnum text-sm">
-                            <span className="text-accent font-semibold">
-                              {price.couponPrice.display}
-                            </span>{' '}
-                            <span className="was-price">{price.listPrice.display}</span>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleAddOn(addon.key)}
+                        className="mt-1 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                          <span className="font-bold">{addon.name}</span>
+                          {price && (
+                            <span className="tnum shrink-0 text-sm">
+                              <span className="was-price mr-2">{price.listPrice.display}</span>
+                              <span className="font-bold text-accent">
+                                +{price.couponPrice.display}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-fg-muted mt-1.5">{addon.effect} for the life of the account.</p>
+                        {/* The limitation sits with the price, at the same size
+                            as the pitch. An upgrade that raises variance has to
+                            say so where it is being sold. */}
+                        <p className="text-xs text-fg-subtle mt-1 leading-relaxed">
+                          {addon.limitation}
+                        </p>
+                        {addon.status !== 'CONFIRMED' && (
+                          <span className="inline-block mt-2">
+                            <Badge tone="warn">Price not final</Badge>
                           </span>
                         )}
                       </div>
-                      <p className="label mt-1.5 text-[10px] text-accent">{addon.effect}</p>
-                      <p className="text-sm text-fg-muted mt-1">{addon.description}</p>
-                      {/* The limitation sits with the price, at the same size as
-                          the description. An upgrade that raises variance has to
-                          say so where it is being sold. */}
-                      <p className="text-xs text-fg-subtle mt-1.5 leading-relaxed">
-                        {addon.limitation}
-                      </p>
-                      {addon.status !== 'CONFIRMED' && (
-                        <span className="inline-block mt-2">
-                          <Badge tone="warn">Price not final</Badge>
-                        </span>
-                      )}
                     </div>
                   </label>
                 );
@@ -517,8 +518,10 @@ export function AccountConfigurator({
             {preview && preview.productionBlockers.length > 0 && (
               <Callout tone="warn" title="Demonstration only">
                 <p>
-                  {preview.productionBlockers.length} commercial terms are still awaiting owner
-                  approval, so this account cannot be sold for real money yet.
+                  {preview.productionBlockers.length === 1
+                    ? 'One commercial term is'
+                    : `${preview.productionBlockers.length} commercial terms are`}{' '}
+                  still awaiting owner approval, so this account cannot be sold for real money yet.
                 </p>
                 <details className="mt-2">
                   <summary className="cursor-pointer underline">Which ones</summary>

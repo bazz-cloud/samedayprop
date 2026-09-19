@@ -4,15 +4,23 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getCurrentUser } from '@/server/auth/session';
 import { createQuote, requiredDocuments } from '@/server/services/checkout-service';
-import { isPlanKey } from '@/domain/catalog/plans';
-import { isAddOnKey, type AddOnKey } from '@/domain/catalog/addons';
+import { couponPrice, getPlan, isPlanKey } from '@/domain/catalog/plans';
+import {
+  ADDONS,
+  addOnPrice,
+  applyRiskDeltas,
+  isAddOnKey,
+  riskDeltasFor,
+  type AddOnKey,
+} from '@/domain/catalog/addons';
 import { getConfig } from '@/server/config';
 import { DEFAULT_COUPON } from '@/domain/pricing/coupon';
 import { getPlanViews } from '@/server/views/catalog-view';
 import { CheckoutForm, type CheckoutDocument } from '@/components/CheckoutForm';
 import { CheckoutSteps } from '@/components/CheckoutSteps';
-import { CheckoutItem, CheckoutExtra } from '@/components/CheckoutItem';
+import { CheckoutItem } from '@/components/CheckoutItem';
 import { CheckoutSummary, NextSteps, type SummaryLine } from '@/components/CheckoutSummary';
+import { CheckoutUpsell, type UpsellOption } from '@/components/CheckoutUpsell';
 import { Callout } from '@/components/ui';
 import { serialiseMoney } from '@/server/money-mapper';
 
@@ -94,7 +102,6 @@ export default async function CheckoutPage({
 
   const plan = getPlanViews().find((view) => view.key === planKey)!;
   const planLine = quote.lines.find((line) => line.kind === 'ACCOUNT_PLAN');
-  const extraLines = quote.lines.filter((line) => line.kind === 'ADDON');
 
   const summaryLines: SummaryLine[] = quote.lines.map((line) => ({
     key: line.itemKey,
@@ -105,6 +112,51 @@ export default async function CheckoutPage({
   }));
 
   const blockedInProduction = quote.productionBlockers.length > 0;
+
+  // The upgrade rows, priced for THIS plan and shown as the before-and-after of
+  // the limit each one changes. The link re-quotes on the server with the key
+  // added or removed, carrying any typed coupon through, so the browser never
+  // computes a price.
+  const basePlan = getPlan(planKey);
+  const hrefWith = (extra: AddOnKey) => {
+    const params = new URLSearchParams([['plan', planKey]]);
+    for (const key of addOnKeys) if (key !== extra) params.append('addon', key);
+    if (!addOnKeys.includes(extra)) params.append('addon', extra);
+    if (requestedCoupon.length > 0) params.set('coupon', requestedCoupon);
+    return `/checkout?${params.toString()}`;
+  };
+
+  // Every add-on, selected or not, so the row can be ticked and unticked in
+  // place rather than appearing and disappearing from the page.
+  const upsellOptions: UpsellOption[] = ADDONS.map((addon) => {
+    const selected = addOnKeys.includes(addon.key);
+    const list = addOnPrice(addon, planKey);
+    const after = applyRiskDeltas(
+      {
+        dailyLossLimit: basePlan.dailyLossLimit.value,
+        ceilingMinis: basePlan.positionCeiling.value.minis,
+        ceilingMicros: basePlan.positionCeiling.value.micros,
+      },
+      riskDeltasFor([addon.key]),
+    );
+    const isLossUplift = addon.effect.kind === 'daily-loss-uplift';
+    return {
+      key: addon.key,
+      name: addon.name,
+      limitation: addon.limitation,
+      listPrice: couponApplied ? serialiseMoney(list).display : null,
+      price: couponApplied
+        ? serialiseMoney(couponPrice(list, quote.couponPercentOff ?? 0n)).display
+        : serialiseMoney(list).display,
+      before: isLossUplift
+        ? basePlan.dailyLossLimit.value.format()
+        : `${basePlan.positionCeiling.value.minis} minis`,
+      after: isLossUplift ? after.dailyLossLimit.format() : `${after.ceilingMinis} minis`,
+      selected,
+      toggleHref: hrefWith(addon.key),
+      icon: isLossUplift ? ('gauge' as const) : ('size' as const),
+    };
+  });
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 pb-28 sm:py-10 lg:pb-10">
@@ -165,17 +217,25 @@ export default async function CheckoutPage({
                 ]}
               />
             )}
-            {extraLines.map((line) => (
-              <CheckoutExtra
-                key={line.itemKey}
-                name={line.name}
-                listPrice={
-                  line.lineDiscount.isZero() ? null : serialiseMoney(line.lineSubtotal).display
-                }
-                price={serialiseMoney(line.lineTotal).display}
-              />
-            ))}
           </section>
+
+          {upsellOptions.length > 0 && (
+            <section aria-labelledby="upsell-heading" className="space-y-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 id="upsell-heading" className="label">
+                  Upgrade
+                </h2>
+                <p className="no-caps text-xs text-fg-subtle">
+                  Optional. Neither changes what you get paid.
+                </p>
+              </div>
+              <CheckoutUpsell options={upsellOptions} />
+              <p className="no-caps text-xs text-fg-subtle leading-relaxed">
+                These are applied when the account is created, so they are bought here or not at
+                all.
+              </p>
+            </section>
+          )}
 
           <section aria-labelledby="sign-heading" className="space-y-3">
             <h2 id="sign-heading" className="label">

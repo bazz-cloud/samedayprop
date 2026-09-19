@@ -75,24 +75,3 @@ export function CheckoutItem({
     </div>
   );
 }
-
-/** A bought extra: one row, no tile — it is not the product. */
-export function CheckoutExtra({
-  name,
-  listPrice,
-  price,
-}: {
-  name: string;
-  listPrice: string | null;
-  price: string;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 rounded-xl border border-border bg-surface px-5 py-3.5">
-      <p className="no-caps text-sm font-bold">{name}</p>
-      <p className="tnum shrink-0 text-sm">
-        {listPrice && <span className="was-price mr-2">{listPrice}</span>}
-        {price}
-      </p>
-    </div>
-  );
-}
