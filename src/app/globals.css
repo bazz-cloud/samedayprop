@@ -134,6 +134,81 @@ h4,
  * threshold associated with photosensitive seizures, and it stops entirely
  * under prefers-reduced-motion.
  * ------------------------------------------------------------------------- */
+/*
+ * The rolling discount strip.
+ *
+ * The track holds two identical runs and slides by exactly half its width, so
+ * the second run lands where the first began and the loop has no seam. Motion
+ * is off entirely under prefers-reduced-motion; the content then centres and
+ * sits still rather than scrolling slowly.
+ */
+.promo-ticker {
+  position: relative;
+}
+
+.promo-ticker-track {
+  display: flex;
+  width: max-content;
+  animation: promo-scroll 38s linear infinite;
+}
+
+.promo-ticker-run {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.promo-ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-right: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@keyframes promo-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .promo-ticker-track {
+    animation: none;
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* One run is enough when nothing moves; a second would just repeat itself. */
+  .promo-ticker-run:last-child,
+  .promo-ticker-item:not(:first-child) {
+    display: none;
+  }
+}
+
+/*
+ * A struck-through list price.
+ *
+ * The number stays muted so it does not compete with the price you actually
+ * pay; the LINE is the accent, which is what makes the discount read at a
+ * glance. Defined once because it appears on cards, tables, the configurator,
+ * the reset offer and both checkout components, and a strikethrough that is
+ * green in some places and grey in others just looks like a mistake.
+ */
+.was-price {
+  color: var(--color-fg-subtle);
+  text-decoration-line: line-through;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 2px;
+}
+
 .coupon-chip {
   display: inline-block;
   font-family: var(--font-mono);

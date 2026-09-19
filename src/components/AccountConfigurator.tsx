@@ -173,7 +173,7 @@ export function AccountConfigurator({
                         <span className="text-accent font-semibold tnum">
                           {option.couponPrice.display}
                         </span>
-                        <span className="text-fg-subtle line-through text-sm tnum">
+                        <span className="was-price text-sm tnum">
                           {option.listPrice.display}
                         </span>
                       </div>
@@ -320,7 +320,7 @@ export function AccountConfigurator({
                           <span className="text-accent font-semibold">
                             {addon.couponPrice.display}
                           </span>{' '}
-                          <span className="text-fg-subtle line-through">
+                          <span className="was-price">
                             {addon.listPrice.display}
                           </span>
                         </span>
@@ -421,7 +421,7 @@ export function AccountConfigurator({
                         <dd className="tnum shrink-0 text-right">
                           {line.lineDiscount.display !== '$0.00' ? (
                             <>
-                              <span className="text-fg-subtle line-through mr-2">
+                              <span className="was-price mr-2">
                                 {line.lineSubtotal.display}
                               </span>
                               <span>{line.lineTotal.display}</span>
@@ -461,6 +461,18 @@ export function AccountConfigurator({
                       </dd>
                     </div>
                   </dl>
+                )}
+
+                {/* The prices on the cards above are quoted with the code, so a
+                    summary quietly showing list price would read as the price
+                    having gone up between two parts of the same page. The code
+                    is not applied for them — this says where to put it. */}
+                {preview && preview.discountTotal.minor === '0' && (
+                  <p className="mt-3 rounded-lg border border-accent/40 bg-card-accent px-3 py-2 text-sm">
+                    Enter code{' '}
+                    <span className="font-mono font-bold text-accent">{plan.couponCode}</span> in
+                    step 4 for {plan.couponPercentOff}% off this total.
+                  </p>
                 )}
 
                 {!preview && loading && (

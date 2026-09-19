@@ -152,6 +152,14 @@ const REQUIRED: readonly { page: string; label: string; text: string }[] = [
     label: 'advertised prices exclude sales tax',
     text: 'Michigan sales tax of 6% is added to the discounted total at checkout',
   },
+  {
+    // The ticker advertises the terms it is offering. If the coupon ever gains
+    // an expiry or a usage limit, this line becomes false and has to move with
+    // it — the test is here so it cannot be forgotten.
+    page: 'src/components/PromoTicker.tsx',
+    label: 'the code carries no expiry and no usage limit',
+    text: 'No expiry, no limit on uses',
+  },
 ];
 
 describe('disclosures survive compression', () => {

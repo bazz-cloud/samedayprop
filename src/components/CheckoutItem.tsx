@@ -58,7 +58,7 @@ export function CheckoutItem({
             the name into three lines beside it. */}
         <div className="shrink-0 basis-full text-right sm:basis-auto">
           {listPrice && (
-            <p className="tnum text-sm text-fg-disabled line-through">{listPrice}</p>
+            <p className="was-price tnum text-sm">{listPrice}</p>
           )}
           <p className="tnum text-xl font-bold">{price}</p>
         </div>
@@ -90,7 +90,7 @@ export function CheckoutExtra({
     <div className="flex items-baseline justify-between gap-4 rounded-xl border border-border bg-surface px-5 py-3.5">
       <p className="no-caps text-sm font-bold">{name}</p>
       <p className="tnum shrink-0 text-sm">
-        {listPrice && <span className="text-fg-disabled line-through mr-2">{listPrice}</span>}
+        {listPrice && <span className="was-price mr-2">{listPrice}</span>}
         {price}
       </p>
     </div>

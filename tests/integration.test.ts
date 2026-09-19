@@ -61,6 +61,20 @@ async function seedBaseline(): Promise<void> {
     },
   });
 
+  // A single-use code, seeded alongside the unlimited launch code so the
+  // per-customer enforcement path keeps a test after START25 lost its limit.
+  await prisma.coupon.upsert({
+    where: { code: 'ONEPER' },
+    update: {},
+    create: {
+      code: 'ONEPER',
+      percentOff: Number(coupon.percentOff),
+      scope: coupon.scope,
+      maxRedemptionsPerCustomer: 1,
+      active: true,
+    },
+  });
+
   for (const document of LEGAL_DOCUMENT_DRAFTS) {
     await prisma.legalDocumentVersion.upsert({
       where: { slug_version: { slug: document.slug, version: document.version } },
@@ -1031,7 +1045,7 @@ describe('authorisation', () => {
 });
 
 describe('coupon usage under concurrency', () => {
-  it('enforces the per-customer limit inside the order transaction', async () => {
+  it('enforces a per-customer limit inside the order transaction', async () => {
     const user = await makeUser();
 
     // BOTH quotes are created up front, while the coupon is still unused — the
@@ -1040,13 +1054,13 @@ describe('coupon usage under concurrency', () => {
     const first = await createQuote({
       planKey: 'SIM_25K',
       addOnKeys: [],
-      couponCode: 'START25',
+      couponCode: 'ONEPER',
       userId: user.id,
     });
     const second = await createQuote({
       planKey: 'SIM_25K',
       addOnKeys: [],
-      couponCode: 'START25',
+      couponCode: 'ONEPER',
       userId: user.id,
     });
     expect(first.couponRejection).toBeNull();
@@ -1074,12 +1088,12 @@ describe('coupon usage under concurrency', () => {
     expect(await prisma.couponRedemption.count({ where: { userId: user.id } })).toBe(1);
   });
 
-  it('shows a later quote that the code is already spent', async () => {
+  it('shows a later quote that a single-use code is already spent', async () => {
     const user = await makeUser();
     const first = await createQuote({
       planKey: 'SIM_25K',
       addOnKeys: [],
-      couponCode: 'START25',
+      couponCode: 'ONEPER',
       userId: user.id,
     });
     await signEverything(user.id, first.quoteId);
@@ -1092,12 +1106,38 @@ describe('coupon usage under concurrency', () => {
     const later = await createQuote({
       planKey: 'SIM_25K',
       addOnKeys: [],
-      couponCode: 'START25',
+      couponCode: 'ONEPER',
       userId: user.id,
     });
     expect(later.couponRejection).toMatch(/already used/);
     // And the quote is priced at full list, not silently discounted anyway.
     expect(later.quote.taxableTotal.toDecimalString()).toBe('349.00');
+  });
+
+  it('lets the same customer use START25 on a second account', async () => {
+    // The owner set no per-customer limit, so a repeat buyer keeps the price
+    // the site advertises. This is the test that would fail if a limit came
+    // back without the marketing pages changing with it.
+    const user = await makeUser();
+    for (const attempt of [1, 2]) {
+      const quote = await createQuote({
+        planKey: 'SIM_25K',
+        addOnKeys: [],
+        couponCode: 'START25',
+        userId: user.id,
+      });
+      expect(quote.couponRejection).toBeNull();
+      expect(quote.quote.taxableTotal.toDecimalString()).toBe('261.75');
+      await signEverything(user.id, quote.quoteId);
+      await createOrder({
+        userId: user.id,
+        quoteId: quote.quoteId,
+        idempotencyKey: `repeat-${attempt}-${user.id}`,
+      });
+    }
+    expect(
+      await prisma.couponRedemption.count({ where: { userId: user.id, coupon: { code: 'START25' } } }),
+    ).toBe(2);
   });
 });
 

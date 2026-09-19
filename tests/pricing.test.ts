@@ -218,10 +218,41 @@ describe('coupon validation', () => {
     ).toMatchObject({ ok: false, reason: 'GLOBAL_LIMIT_REACHED' });
   });
 
-  it('enforces the per-customer redemption limit', () => {
+  it('keeps the advertised terms and the coupon definition in step', () => {
+    // The ticker says "no expiry, no limit on uses" on every page. These three
+    // nulls are that sentence, in code.
+    expect(DEFAULT_COUPON.status).toBe('CONFIRMED');
+    expect(coupon.validUntil).toBeNull();
+    expect(coupon.maxRedemptions).toBeNull();
+    expect(coupon.maxRedemptionsPerCustomer).toBeNull();
+  });
+
+  it('lets one customer use START25 again, because the owner set no per-customer limit', () => {
+    expect(coupon.maxRedemptionsPerCustomer).toBeNull();
+    expect(coupon.maxRedemptions).toBeNull();
+    expect(coupon.validUntil).toBeNull();
     expect(
-      validateCoupon(coupon, { globalRedemptions: 0, customerRedemptions: 1 }, now, 1),
+      validateCoupon(coupon, { globalRedemptions: 4_000, customerRedemptions: 9 }, now, 1),
+    ).toMatchObject({ ok: true });
+  });
+
+  it('still enforces a per-customer limit when a coupon carries one', () => {
+    // The mechanism is not deleted along with the limit: a future single-use
+    // code has to keep working, and this is what says so.
+    const limited = { ...coupon, code: 'ONEPER', maxRedemptionsPerCustomer: 1 };
+    expect(
+      validateCoupon(limited, { globalRedemptions: 0, customerRedemptions: 1 }, now, 1),
     ).toMatchObject({ ok: false, reason: 'CUSTOMER_LIMIT_REACHED' });
+    expect(
+      validateCoupon(limited, { globalRedemptions: 0, customerRedemptions: 0 }, now, 1),
+    ).toMatchObject({ ok: true });
+  });
+
+  it('still enforces a global limit when a coupon carries one', () => {
+    const limited = { ...coupon, code: 'FIRST100', maxRedemptions: 100 };
+    expect(
+      validateCoupon(limited, { globalRedemptions: 100, customerRedemptions: 0 }, now, 1),
+    ).toMatchObject({ ok: false, reason: 'GLOBAL_LIMIT_REACHED' });
   });
 
   it('rejects when nothing in the order is eligible', () => {

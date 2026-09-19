@@ -31,11 +31,11 @@ export const metadata: Metadata = { title: 'Checkout' };
  * simulated-account warning and the production blockers. Those are the reasons
  * this checkout is honest, and they are the first things a redesign deletes.
  *
- * The advertised discount is applied by default. Every page that sells an
- * account shows the coupon price as the price, so arriving here to find the
- * list price would be a bait and switch — `nocoupon=1` is how the code comes
- * off, and the code is still re-validated server-side against live usage before
- * it can move a number.
+ * The discount is NOT applied automatically. Every page that sells an account
+ * shows the list price struck through in green beside the coupon price, with
+ * the code itself in a banner at the top of every page, so arriving here and
+ * typing it is a deliberate act rather than a surprise. Whatever is typed is
+ * re-validated server-side against live usage before it can move a number.
  */
 export default async function CheckoutPage({
   searchParams,
@@ -48,13 +48,10 @@ export default async function CheckoutPage({
   const addOnKeys = (Array.isArray(rawAddons) ? rawAddons : rawAddons ? [rawAddons] : []).filter(
     isAddOnKey,
   ) as AddOnKey[];
-  const declinedCoupon = params.nocoupon === '1';
+  // Typed in, never applied for them. The site advertises the code beside every
+  // struck-through price; entering it here is the customer taking the offer.
   const requestedCoupon = typeof params.coupon === 'string' ? params.coupon.trim() : '';
-  const couponCode = declinedCoupon
-    ? null
-    : requestedCoupon.length > 0
-      ? requestedCoupon
-      : DEFAULT_COUPON.value.code;
+  const couponCode = requestedCoupon.length > 0 ? requestedCoupon : null;
 
   if (!isPlanKey(planKey)) redirect('/accounts');
 
@@ -91,10 +88,9 @@ export default async function CheckoutPage({
     ['plan', planKey],
     ...addOnKeys.map((key) => ['addon', key] as const),
   ];
-  const removeParams = new URLSearchParams([
-    ...selection.map(([name, value]) => [name, value] as [string, string]),
-    ['nocoupon', '1'],
-  ]);
+  const removeParams = new URLSearchParams(
+    selection.map(([name, value]) => [name, value] as [string, string]),
+  );
 
   const plan = getPlanViews().find((view) => view.key === planKey)!;
   const planLine = quote.lines.find((line) => line.kind === 'ACCOUNT_PLAN');
@@ -224,9 +220,10 @@ export default async function CheckoutPage({
                 rejection: couponRejection ?? null,
                 hidden: selection,
                 removeHref: `/checkout?${removeParams.toString()}`,
-                defaultHref: `/checkout?${new URLSearchParams(
-                  selection.map(([name, value]) => [name, value] as [string, string]),
-                ).toString()}`,
+                defaultHref: `/checkout?${new URLSearchParams([
+                  ...selection.map(([name, value]) => [name, value] as [string, string]),
+                  ['coupon', DEFAULT_COUPON.value.code],
+                ]).toString()}`,
               }}
             />
 

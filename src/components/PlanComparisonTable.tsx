@@ -69,7 +69,7 @@ export function PlanComparisonTable({
                 <span className="block text-accent font-semibold tnum">
                   {plan.couponPrice.display}
                 </span>
-                <span className="block text-fg-subtle line-through tnum text-xs">
+                <span className="was-price block tnum text-xs">
                   {plan.listPrice.display}
                 </span>
                 <span className="block text-xs text-fg-subtle mt-1">one-time</span>

@@ -63,7 +63,7 @@ export function PlanCards({ plans }: { plans: readonly PlanView[] }) {
                 <span className="tnum text-2xl font-bold text-accent">
                   {plan.couponPrice.display}
                 </span>
-                <span className="tnum text-sm text-fg-disabled line-through">
+                <span className="was-price tnum text-sm">
                   {plan.listPrice.display}
                 </span>
               </div>

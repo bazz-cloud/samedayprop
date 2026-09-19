@@ -80,7 +80,7 @@ export function CheckoutSummary({
                 line.total
               ) : (
                 <>
-                  <span className="text-fg-disabled line-through mr-2">{line.subtotal}</span>
+                  <span className="was-price mr-2">{line.subtotal}</span>
                   {line.total}
                 </>
               )}

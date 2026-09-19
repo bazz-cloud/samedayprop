@@ -87,17 +87,24 @@ async function seedUsers() {
 
 async function seedCatalogAndPolicies() {
   const coupon = DEFAULT_COUPON.value;
+  // The terms are UPDATED, not left alone on an existing row. Validation reads
+  // the database record, not this constant, so an `update: {}` here meant that
+  // approving new coupon terms never reached the code customers actually use —
+  // the same failure the catalog had before publishCatalogRevisions().
+  const couponTerms = {
+    percentOff: Number(coupon.percentOff),
+    scope: coupon.scope,
+    validFrom: coupon.validFrom === null ? null : new Date(coupon.validFrom),
+    validUntil: coupon.validUntil === null ? null : new Date(coupon.validUntil),
+    maxRedemptions: coupon.maxRedemptions,
+    maxRedemptionsPerCustomer: coupon.maxRedemptionsPerCustomer,
+    stackable: coupon.stackable,
+    active: coupon.active,
+  };
   await prisma.coupon.upsert({
     where: { code: coupon.code },
-    update: {},
-    create: {
-      code: coupon.code,
-      percentOff: Number(coupon.percentOff),
-      scope: coupon.scope,
-      maxRedemptions: coupon.maxRedemptions,
-      maxRedemptionsPerCustomer: coupon.maxRedemptionsPerCustomer,
-      active: coupon.active,
-    },
+    update: couponTerms,
+    create: { code: coupon.code, ...couponTerms },
   });
 
   for (const document of LEGAL_DOCUMENT_DRAFTS) {

@@ -6,7 +6,7 @@
  * worth, what it applies to, or what the resulting price is.
  */
 
-import { proposed, type Governed } from '../config/requirement-status';
+import { confirmed, type Governed } from '../config/requirement-status';
 
 export type CouponScope = 'ACCOUNT_PLANS' | 'ADDONS' | 'ALL_ELIGIBLE';
 
@@ -29,10 +29,18 @@ export interface CouponDefinition {
 }
 
 /**
- * The launch coupon is a PLACEHOLDER. Name, validity window and use limits all
- * remain configurable and are not commercially committed.
+ * The launch coupon.
+ *
+ * OWNER DECISION, 2026-09-19: START25, 25% off, unlimited uses, no per-customer
+ * limit and no expiry. It is advertised on every page and typed in at checkout,
+ * never applied automatically — the struck-through list price and the code in
+ * the banner are the offer; entering the code is the customer accepting it.
+ *
+ * Unlimited and undated means this is effectively the price. Every model in
+ * docs/FINANCIAL_STRESS.md is run on the discounted figure for that reason: a
+ * coupon nobody can fail to use is not a discount, it is the price list.
  */
-export const DEFAULT_COUPON: Governed<CouponDefinition> = proposed(
+export const DEFAULT_COUPON: Governed<CouponDefinition> = confirmed(
   {
     code: 'START25',
     percentOff: 25n,
@@ -40,12 +48,12 @@ export const DEFAULT_COUPON: Governed<CouponDefinition> = proposed(
     validFrom: null,
     validUntil: null,
     maxRedemptions: null,
-    maxRedemptionsPerCustomer: 1,
+    maxRedemptionsPerCustomer: null,
     stackable: false,
     active: true,
   },
-  'Coupon code, validity window and use limits are placeholders pending owner decision.',
-  'Build prompt §2 — "Coupon placeholder: START25"',
+  'START25, 25% off every eligible item. Unlimited uses, no per-customer limit, no expiry.',
+  'Owner decision 2026-09-19',
 );
 
 export type CouponRejectionReason =

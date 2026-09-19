@@ -4,6 +4,7 @@ import { getConfig } from '@/server/config';
 import { DemoBanner } from '@/components/DemoBanner';
 import { SiteHeader } from '@/components/SiteHeader';
 import { ValueBar } from '@/components/ValueBar';
+import { PromoTicker } from '@/components/PromoTicker';
 import { CredentialsBanner } from '@/components/CredentialsBanner';
 import { prisma } from '@/server/db';
 import { getCredentialForUser } from '@/server/services/credential-service';
@@ -63,6 +64,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         {config.isDemo && <DemoBanner />}
         <SiteHeader user={user} />
+        {/* Kept on checkout too, unlike the value bar: the code has to be
+            readable on the page where it gets typed in. */}
+        <PromoTicker />
         <ValueBar />
         {credential && <CredentialsBanner data={credential} />}
         <main id="main" className="flex-1">
