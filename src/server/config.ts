@@ -36,8 +36,14 @@ export interface ProviderConfig {
      * environment. The test environment is the staging domain.
      */
     readonly simBaseUrl: string | null;
-    /** The live-trading host. We do not trade live, so this stays unset. */
-    readonly liveBaseUrl: string | null;
+    /**
+     * The market data feed host.
+     *
+     * There is deliberately NO live-trading host here. Every account this
+     * business sells is simulated, so the live hosts are not configured, not
+     * exposed and not reachable — the safest way to never send an order to a
+     * live exchange by accident is to have no address for one.
+     */
     readonly marketDataUrl: string | null;
     /** Organization id issued with the API key. Required on every call. */
     readonly cid: string | null;
@@ -134,21 +140,26 @@ function readMode(): AppMode {
 }
 
 /**
- * Tradovate's published hosts, by environment.
+ * Tradovate's hosts, by environment — SIMULATION AND MARKET DATA ONLY.
  *
- * Hard-coded rather than read from an env var so a typo cannot silently point
- * the simulation engine at the live one. Source: the Tradovate Partner API
- * introduction page.
+ * Tradovate publishes a third host per environment for live trading. It is
+ * deliberately absent from this map and from the configuration type. Owner
+ * decision, 2026-09-19: this business sells simulated accounts and nothing
+ * else, so there is no circumstance in which it should hold the address of a
+ * live order-routing endpoint. A constant that does not exist cannot be
+ * selected by a typo, a bad environment variable, or a future edit that means
+ * well.
+ *
+ * Hard-coded rather than read from an env var for the same reason. Source: the
+ * Tradovate Partner API introduction page, read 2026-09-19.
  */
 const TRADOVATE_HOSTS = {
   PRODUCTION: {
     sim: 'https://demo.tradovateapi.com',
-    live: 'https://live.tradovateapi.com',
     md: 'https://md.tradovateapi.com',
   },
   STAGING: {
     sim: 'https://demo-api.staging.ninjatrader.dev',
-    live: 'https://live-api.staging.ninjatrader.dev',
     md: 'https://md-api.staging.ninjatrader.dev',
   },
 } as const;
@@ -164,7 +175,7 @@ function readTradovateEnvironment(): 'STAGING' | 'PRODUCTION' | null {
 
 function tradovateHost(
   environment: 'STAGING' | 'PRODUCTION' | null,
-  which: 'sim' | 'live' | 'md',
+  which: 'sim' | 'md',
 ): string | null {
   return environment ? TRADOVATE_HOSTS[environment][which] : null;
 }
@@ -197,7 +208,6 @@ export function getConfig(): AppConfig {
       configured: tradingConfigured,
       environment: tradovateEnvironment,
       simBaseUrl: tradovateHost(tradovateEnvironment, 'sim'),
-      liveBaseUrl: tradovateHost(tradovateEnvironment, 'live'),
       marketDataUrl: tradovateHost(tradovateEnvironment, 'md'),
       cid: env('TRADOVATE_CID') ?? null,
     },

@@ -22,19 +22,28 @@ vendor's statements, not results of calls we have made.
 representative: **organization admin credentials**, an **API key**, and a
 **CID** (organization id).
 
-**Hosts.**
+**Hosts — the two we use, and only those.**
 
-| | Simulation engine | Live | Market data |
-|---|---|---|---|
-| Production | `demo.tradovateapi.com` | `live.tradovateapi.com` | `md.tradovateapi.com` |
-| Staging | `demo-api.staging.ninjatrader.dev` | `live-api.staging.ninjatrader.dev` | `md-api.staging.ninjatrader.dev` |
+| | Simulation engine | Market data |
+|---|---|---|
+| Production | `demo.tradovateapi.com` | `md.tradovateapi.com` |
+| Staging | `demo-api.staging.ninjatrader.dev` | `md-api.staging.ninjatrader.dev` |
+
+Tradovate publishes a third host per environment for **live trading**. Owner
+decision, 2026-09-19: it is not configured, not exposed and not present in the
+source at all. This business sells simulated accounts and nothing else, so there
+is no circumstance in which it should hold the address of a live order-routing
+endpoint — and a constant that does not exist cannot be selected by a typo, a
+bad environment variable, or a future edit that means well.
+`tests/platforms.test.ts` greps the config source for both live hostnames and
+fails if either reappears.
 
 **Read that table twice.** `demo.tradovateapi.com` is a *production* host that
-serves the simulation engine. It is not a test environment. Everything this
-business sells is a simulated account, so production traffic goes to `demo.` and
-the test environment is the staging domain. Getting this backwards means either
-testing against production or running the business against staging. The hosts
-are hard-coded per environment in `src/server/config.ts` for that reason.
+serves the simulation engine. It is not a test environment. Production traffic
+goes to `demo.` and the test environment is the staging domain. Getting this
+backwards means either testing against production or running the business
+against staging. The hosts are hard-coded per environment in
+`src/server/config.ts` for that reason.
 
 **Stated partner capabilities**, each of which maps onto a capability in our
 provider interface:
