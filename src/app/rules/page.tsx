@@ -11,6 +11,7 @@ import {
   type Status,
 } from '@/components/system';
 import { DrawdownDiagram } from '@/components/DrawdownDiagram';
+import { RulesBrowser, type RuleSection } from '@/components/RulesBrowser';
 import { PositionCeilingGraphic } from '@/components/PositionCeilingGraphic';
 import { POLICY_DRAFTS, type PolicyStance } from '@/domain/policy/policies';
 
@@ -40,6 +41,114 @@ export default function RulesPage() {
     ).values(),
   ];
 
+  const tierRows = (pick: (plan: (typeof plans)[number]) => readonly string[]) =>
+    plans.map((plan) => ({ planKey: plan.key, label: plan.label, values: pick(plan) }));
+
+  /**
+   * The rulebook, as data.
+   *
+   * Each card carries its own table across all five sizes so nobody has to jump
+   * back to pricing, and each caveat is attached to the rule it qualifies rather
+   * than stacked with seven others at the foot of the page.
+   */
+  const sections: RuleSection[] = [
+    {
+      id: 'ends-account',
+      title: 'What ends your account',
+      cards: [
+        {
+          id: 'trailing',
+          title: 'Trailing drawdown',
+          summary: 'Touch the floor and the account ends.',
+          body: [
+            'A threshold follows your equity upward, including unrealized gains on open positions, and never moves back down. Once it reaches your starting balance plus $100 it stops rising.',
+            'Equity touching the threshold is a breach, not only falling below it.',
+          ],
+          table: {
+            columns: ['Account', 'Allowance', 'Floor starts at', 'Floor stops at'],
+            rows: tierRows((plan) => [
+              plan.drawdownAllowance.display,
+              plan.initialThreshold.display,
+              plan.trailingStopAt.display,
+            ]),
+          },
+          caveat:
+            'A withdrawal lowers your equity without moving the threshold, so it spends the room between them.',
+        },
+        {
+          id: 'daily-loss',
+          title: 'Daily loss limit',
+          summary: 'Lose your daily limit and you are locked out until 18:00 ET.',
+          body: [
+            'Measured on your session trading results, realized and unrealized, after commissions and fees. Reaching it flattens your positions.',
+            'Sessions roll at 17:00 ET. Trading reopens an hour later at the Globex reopen.',
+          ],
+          table: {
+            columns: ['Account', 'Daily loss limit'],
+            rows: tierRows((plan) => [plan.dailyLossLimit.display]),
+          },
+          caveat:
+            'Withdrawals are not trading losses. Withdraw $2,000 and trade flat and your daily loss is zero, though your trailing room is still reduced.',
+        },
+        {
+          id: 'positions',
+          title: 'Position limits',
+          summary: 'Minis and micros share one ceiling. 1 mini = 10 micros.',
+          body: [
+            'Working entry orders count toward the ceiling, not just filled positions. In a bracket or OCO set only the largest leg counts.',
+            'Instruments are not netted against each other, and an instrument without approved risk controls cannot be traded at all.',
+          ],
+          table: {
+            columns: ['Account', 'Minis', 'Micros'],
+            rows: tierRows((plan) => [
+              String(plan.positionCeiling.minis),
+              String(plan.positionCeiling.micros),
+            ]),
+          },
+        },
+      ],
+    },
+    {
+      id: 'payout-eligibility',
+      title: 'Payout eligibility',
+      cards: [
+        {
+          id: 'eligibility',
+          title: 'When you can withdraw',
+          summary: 'You keep 50% of gross, in cash, the same day.',
+          body: [
+            'Your balance must exceed your starting balance plus your buffer by at least $500 gross. You must be flat, with no working orders, on an active account we hold current data for.',
+            'Capacity is reserved when you request, not when you are paid, so a pending request keeps counting against the day it was made.',
+          ],
+          table: {
+            columns: ['Account', 'Buffer', 'First payout at', 'Daily cash cap', 'Lifetime cap'],
+            rows: tierRows((plan) => [
+              plan.retainedBuffer.display,
+              plan.firstWithdrawalAt.display,
+              plan.dailyCashCap.display,
+              plan.lifetimeCapResolved
+                ? (plan.lifetimeCapDescription.split(' ')[0] ?? '—')
+                : 'Not decided',
+            ]),
+          },
+          caveat:
+            'Eligibility, processing and settlement are three different things. We do not guarantee same-day receipt of funds in your bank account, and you should be sceptical of anyone who does.',
+        },
+        {
+          id: 'resets',
+          title: 'Resets',
+          summary: 'Breached an account? Reset it for $10 less than a new one.',
+          body: [
+            'A reset restores your starting balance, high-water mark and threshold. It is available once an account can no longer trade, and not while a payout request is in progress.',
+            'A daily loss lockout needs no reset. It lifts by itself at the next market open.',
+          ],
+          caveat:
+            'A reset does not restore lifetime payout capacity you have already used. An account at its lifetime cap cannot be usefully reset, and we will not sell you one.',
+        },
+      ],
+    },
+  ];
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-12 space-y-12">
       <header>
@@ -48,6 +157,43 @@ export default function RulesPage() {
           Every limit on your account, with the arithmetic behind it.
         </p>
       </header>
+
+      {/* The three things that end an account, first and in red. A visitor who
+          reads nothing else on this page should still leave knowing these. */}
+      <section aria-labelledby="immediate" className="space-y-3">
+        <h2 id="immediate" className="text-xl text-danger">
+          These end your account immediately
+        </h2>
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            {
+              title: 'Touching the trailing floor',
+              detail: `On the ${fiftyK.label} account the floor starts at ${fiftyK.initialThreshold.display} and only rises.`,
+            },
+            {
+              title: 'Breaching the daily loss limit',
+              detail: `${fiftyK.dailyLossLimit.display} on the ${fiftyK.label} account. Positions are flattened and trading locks until 18:00 ET.`,
+            },
+            {
+              title: 'Exceeding position limits',
+              detail: `${fiftyK.positionCeiling.minis} minis or ${fiftyK.positionCeiling.micros} micros on the ${fiftyK.label} account, counted as one shared ceiling.`,
+            },
+          ].map((item) => (
+            <div
+              key={item.title}
+              className="rounded-xl border border-border-strong bg-card-danger p-4"
+            >
+              <p className="no-caps font-bold">{item.title}</p>
+              <p className="no-caps mt-1.5 text-sm text-fg-muted leading-relaxed">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+        <p className="no-caps text-xs text-fg-fine">
+          A breach ends trading on that account. The fee is not refunded.
+        </p>
+      </section>
+
+      <RulesBrowser sections={sections} />
 
       <section aria-labelledby="drawdown" className="space-y-4">
         <h2 id="drawdown" className="text-2xl">

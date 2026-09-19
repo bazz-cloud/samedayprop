@@ -10,8 +10,9 @@ import type { PlanView } from '@/server/views/catalog-view';
  * the monospace face.
  *
  * Three cards, not five: a visitor comparing five columns is doing work the
- * page should have done. The two largest sizes sit below as chips, and the full
- * five-way table stays one link away for anyone who genuinely wants it.
+ * page should have done. The two largest sizes sit below as chips, and every
+ * per-size figure lives on the rules page, where each rule carries its own
+ * table across all five.
  */
 
 const TIERS = [
@@ -102,9 +103,6 @@ export function PlanCards({ plans }: { plans: readonly PlanView[] }) {
             {plan.label} <span className="text-fg-subtle">·</span> {plan.couponPrice.display}
           </Link>
         ))}
-        <Link href="#compare" className="no-caps text-sm text-accent hover:underline">
-          Compare all five side by side &rarr;
-        </Link>
       </div>
     </div>
   );

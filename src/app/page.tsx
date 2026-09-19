@@ -46,35 +46,6 @@ export default function HomePage() {
           <WithdrawalCalculator plans={calculatorPlans} />
         </section>
 
-        <section aria-labelledby="tradeoff" className="pb-14">
-          <h2 id="tradeoff" className="text-2xl mb-5">
-            The trade-off, stated plainly
-          </h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-border-strong bg-card p-5">
-              <p className="label">Them</p>
-              <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
-                80&ndash;90% split, but you pay monthly, pass an evaluation, and meet consistency
-                and minimum-day rules first.
-              </p>
-            </div>
-            <div className="rounded-xl border border-accent bg-card-accent p-5">
-              <p className="label text-accent">Us</p>
-              <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
-                50% split, one payment, trade the account the hour you buy it and withdraw the day
-                you qualify.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border-strong bg-card-danger p-5">
-              <p className="label text-danger">The risk</p>
-              <p className="no-caps mt-3 text-sm text-fg-muted leading-relaxed">
-                You can breach a limit, lose access, and lose the fee. Most participants in programs
-                of this kind never receive a payout.
-              </p>
-            </div>
-          </div>
-        </section>
-
         <section aria-labelledby="plans" className="pb-14">
           <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
             <h2 id="plans" className="text-2xl">
